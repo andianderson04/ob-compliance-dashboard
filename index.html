@@ -51,6 +51,8 @@ body{font-family:var(--sans);background:var(--canvas);color:var(--ink);font-size
 .header-logo svg{width:22px;height:22px}
 .header-title{font-size:13px;font-weight:600;color:#fff;letter-spacing:.07em;text-transform:uppercase}
 .header-sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;letter-spacing:.02em}
+.header-asof{font-size:10px;color:rgba(255,255,255,.4);margin-top:4px;letter-spacing:.02em;font-style:italic}
+.header-asof span{color:rgba(255,255,255,.65);font-weight:500;font-style:normal}
 .header-right{display:flex;align-items:center;gap:12px;padding:16px 0;border-left:1px solid rgba(255,255,255,.1);padding-left:24px}
 .header-badge{
   background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);
@@ -266,6 +268,7 @@ tbody tr:hover td{background:#eef4fc}
       <div>
         <div class="header-title">TA&#8209;Onboarding Compliance Dashboard</div>
         <div class="header-sub">Statutory number compliance &mdash; Active, Off-Roster &amp; Off-Detailing employees</div>
+        <div class="header-asof" id="header-asof" style="display:none">Data updated as of <span id="asof-date"></span></div>
       </div>
     </div>
     <div class="header-right">
@@ -445,6 +448,7 @@ async function init() {
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
+  setAsOfDate();
   buildFilters(); buildHead(); doFilter();
 }
 
@@ -538,6 +542,7 @@ function processFile(buffer,status){
         buildFilters();doFilter();
         status.className='upload-status ok';
         status.textContent='✓ Loaded '+all.length.toLocaleString()+' active / off-roster / off-detailing employees. Dashboard updated.';
+        setAsOfDate(new Date());
       }
     }
     setTimeout(processChunk,0);
@@ -657,6 +662,19 @@ function exportXLSX(){
   XLSX.utils.book_append_sheet(wb,ws,'Compliance');
   XLSX.writeFile(wb,'TA_Onboarding_Compliance_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
+
+function setAsOfDate(date){
+  const d = date || new Date();
+  const opts = {year:'numeric', month:'long', day:'numeric'};
+  const formatted = d.toLocaleDateString('en-PH', opts);
+  document.getElementById('asof-date').textContent = formatted;
+  document.getElementById('header-asof').style.display = 'block';
+  // persist in sessionStorage so refresh keeps it
+  if(date) sessionStorage.setItem('asof', d.toISOString());
+}
+// restore from session if available
+const _saved = sessionStorage.getItem('asof');
+if(_saved) { window.addEventListener('DOMContentLoaded', ()=>setAsOfDate(new Date(_saved))); }
 
 init();
 </script>
