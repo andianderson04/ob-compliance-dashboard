@@ -615,7 +615,7 @@ function updateKPIs(){
   set('k-total',t.toLocaleString());
   set('k-ok',ok.toLocaleString(),'c-ok');
   set('k-miss',any.toLocaleString(),any>0?'c-bad':'c-ok');
-  set('k-rate',rate+'%',rate>=95?'c-ok':rate>=80?'c-warn':'c-bad');
+  set('k-rate',rate+'%',rate>=92?'c-ok':rate>=90?'c-warn':'c-bad');
   set('k-tin',tm.toLocaleString(),tm>0?'c-bad':'c-ok');
   set('k-sss',sm.toLocaleString(),sm>0?'c-bad':'c-ok');
   set('k-pag',pm.toLocaleString(),pm>0?'c-bad':'c-ok');
