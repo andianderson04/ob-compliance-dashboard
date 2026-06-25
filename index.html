@@ -255,6 +255,12 @@ tbody tr:hover td{background:#eef4fc}
 .tab-btn svg{opacity:.6}
 .tab-btn.active svg{opacity:1}
 
+/* ── REQUIREMENT COLUMN HEADER COLORS ── */
+th.req-primary-1,th.req-primary-2,th.req-primary-3{background:#d1fae5;color:#065f46}
+th.req-secondary-1,th.req-secondary-2{background:#fef9c3;color:#854d0e}
+th.req-primary-1:hover,th.req-primary-2:hover,th.req-primary-3:hover{background:#bbf7d0}
+th.req-secondary-1:hover,th.req-secondary-2:hover{background:#fef08a}
+
 /* ── REQUIREMENTS KPI ── */
 .req-kpi-strip{
   display:grid;grid-template-columns:repeat(7,1fr);
@@ -836,11 +842,11 @@ const REQ_COLS = [
   {k:'branch',label:'Branch',                     w:110},
   {k:'dept',  label:'Department',                 w:165},
   {k:'sec',   label:'Section',                    w:130},
-  {k:'peme',  label:'PEME Completion',            w:130, comp:true},
-  {k:'nbi',   label:'NBI Clearance',              w:115, comp:true},
-  {k:'job',   label:'Job Offer & Contract',       w:155, comp:true},
-  {k:'birth', label:'Birth Certificate',          w:135, comp:true},
-  {k:'educ',  label:'Proof of Education',         w:145, comp:true},
+  {k:'peme',  label:'PEME Completion',            w:130, comp:true, thClass:'req-primary-1'},
+  {k:'nbi',   label:'NBI Clearance',              w:115, comp:true, thClass:'req-primary-2'},
+  {k:'job',   label:'Job Offer & Contract',       w:155, comp:true, thClass:'req-primary-3'},
+  {k:'birth', label:'Birth Certificate',          w:135, comp:true, thClass:'req-secondary-1'},
+  {k:'educ',  label:'Proof of Education',         w:145, comp:true, thClass:'req-secondary-2'},
 ];
 
 async function initReqs(){
@@ -937,6 +943,7 @@ function buildReqHead(){
   REQ_COLS.forEach(c=>{
     const th=document.createElement('th');
     th.style.minWidth=c.w+'px';
+    if(c.thClass) th.classList.add(c.thClass);
     th.innerHTML=c.label+' <span class="arr" id="rarr-'+c.k+'">↕</span>';
     th.onclick=()=>reqSortBy(c.k,th);
     tr.appendChild(th);
