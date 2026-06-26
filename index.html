@@ -659,89 +659,70 @@ function processFile(buffer,status){
 
 function processReqFile(buffer, status){
   try{
-    status.textContent='Parsing requirements spreadsheet…';
-    const wb=XLSX.read(buffer,{type:'array',cellDates:true,dense:true,raw:false});
+    status.textContent='Parsing requirements spreadsheet\u2026';
+    const wb=XLSX.read(buffer,{type:'array',raw:true});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-    if(json.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
-    const headers=json[0].map(h=>String(h).trim());
-    const required=['EMPLOYEECODE','EMPLOYEE NAME','EMPLOYMENT STATUS','DOCUMENT TYPE'];
-    const missing=required.filter(c=>!headers.includes(c));
-    if(missing.length){status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
-    const ci={};headers.forEach((h,i)=>ci[h]=i);
-    const statusIdx=ci['EMPLOYMENT STATUS'];
-    const VALID_STATUSES=['Active','Off-Roster','Off-Detailing'];
-    const PEME_TYPES  =['PEME Completion Agreement','PEME Completion Slip','Signed Pre-Employment Medical Exam (PEME) Completion Slip','Signed Pre-employment Medical Exam Completion Slip','PEME Clearance Form'];
-    const NBI_TYPES   =['NBI Clearance','NBI Clearance (Original)'];
-    const JOB_TYPES   =['Signed Job offer and Employment Contract'];
-    const BIRTH_TYPES =['Birth Certificate','Photocopy Birth Certificate (3 copies)'];
-    const EDUC_TYPES  =['Proof of Education (Diploma / Certificate of Graduation / TOR)'];
-
-    status.textContent='Building document sets…';
-
-    // Pass 1: build per-employee doc sets and info
-    const empInfo={}, pemeSet=new Set, nbiSet=new Set, jobSet=new Set, birthSet=new Set, educSet=new Set;
-    const CHUNK=5000; let i=1;
-
+    status.textContent='Converting rows\u2026';
+    const jsonObj=XLSX.utils.sheet_to_json(ws,{defval:''});
+    if(jsonObj.length<1){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    status.textContent='Filtering '+jsonObj.length.toLocaleString()+' rows\u2026';
+    const VALID=new Set(['Active','Off-Roster','Off-Detailing']);
+    const PEME_S =new Set(['PEME Completion Agreement','PEME Completion Slip','Signed Pre-Employment Medical Exam (PEME) Completion Slip','Signed Pre-employment Medical Exam Completion Slip','PEME Clearance Form']);
+    const NBI_S  =new Set(['NBI Clearance','NBI Clearance (Original)']);
+    const JOB_S  =new Set(['Signed Job offer and Employment Contract']);
+    const BIRTH_S=new Set(['Birth Certificate','Photocopy Birth Certificate (3 copies)']);
+    const EDUC_S =new Set(['Proof of Education (Diploma / Certificate of Graduation / TOR)']);
+    const empInfo={},pemeSet=new Set,nbiSet=new Set,jobSet=new Set,birthSet=new Set,educSet=new Set;
+    const CHUNK=8000; let i=0;
     function pass1Chunk(){
-      const end=Math.min(i+CHUNK,json.length);
+      const end=Math.min(i+CHUNK,jsonObj.length);
       for(;i<end;i++){
-        const r=json[i];
-        if(!r||!Array.isArray(r))continue;
-        const estat=String(r[statusIdx]||'').trim();
-        if(!VALID_STATUSES.includes(estat))continue;
-        if(!ecode.match(/^\d+$/))continue;
-        const ecode=String(r[ci['EMPLOYEECODE']]||'').trim();
-        if(!ecode)continue;
+        const r=jsonObj[i];
+        const estat=String(r['EMPLOYMENT STATUS']||'').trim();
+        if(!VALID.has(estat))continue;
+        const ecode=String(r['EMPLOYEECODE']||'').trim();
+        if(!ecode||!/^\d+$/.test(ecode))continue;
         if(!empInfo[ecode]){
           empInfo[ecode]={
-            id:ecode,
-            name:  String(r[ci['EMPLOYEE NAME']]||'').trim(),
-            estat: estat,
-            entity:ci['Entity']!==undefined?String(r[ci['Entity']]||'').trim():'',
-            dept:  ci['Department']!==undefined?String(r[ci['Department']]||'').trim():'',
-            sec:   ci['Section']!==undefined?String(r[ci['Section']]||'').trim():'',
+            id:ecode,name:String(r['EMPLOYEE NAME']||'').trim(),estat:estat,
+            entity:String(r['Entity']||'').trim(),
+            dept:String(r['Department']||'').trim(),
+            sec:String(r['Section']||'').trim(),
+            email:'',
           };
         }
-        const dtype=String(r[ci['DOCUMENT TYPE']]||'').trim();
-        if(PEME_TYPES.includes(dtype))  pemeSet.add(ecode);
-        if(NBI_TYPES.includes(dtype))   nbiSet.add(ecode);
-        if(JOB_TYPES.includes(dtype))   jobSet.add(ecode);
-        if(BIRTH_TYPES.includes(dtype)) birthSet.add(ecode);
-        if(EDUC_TYPES.includes(dtype))  educSet.add(ecode);
+        const dtype=String(r['DOCUMENT TYPE']||'').trim();
+        if(PEME_S.has(dtype))  pemeSet.add(ecode);
+        if(NBI_S.has(dtype))   nbiSet.add(ecode);
+        if(JOB_S.has(dtype))   jobSet.add(ecode);
+        if(BIRTH_S.has(dtype)) birthSet.add(ecode);
+        if(EDUC_S.has(dtype))  educSet.add(ecode);
       }
-      const pct=Math.round((i/json.length)*100);
-      status.textContent='Processing… '+pct+'%';
-      if(i<json.length){ setTimeout(pass1Chunk,0); }
-      else {
-        // Build final records — try to enrich branch from statutory data
-        const branchLookup={};
-        all.forEach(r=>{ if(r.id&&r.branch) branchLookup[r.id]=r.branch; });
+      status.textContent='Processing\u2026 '+Math.round((i/jsonObj.length)*100)+'%';
+      if(i<jsonObj.length){setTimeout(pass1Chunk,0);}
+      else{
+        const branchLookup={}, emailLookup={};
+        all.forEach(r=>{
+          if(r.id&&r.branch) branchLookup[r.id]=r.branch;
+          if(r.id&&r.email)  emailLookup[r.id]=r.email;
+        });
         const records=Object.values(empInfo).map(e=>({
-          ...e,
-          branch: branchLookup[e.id]||'',
-          peme:  pemeSet.has(e.id) ?'Y':'X',
-          nbi:   nbiSet.has(e.id)  ?'Y':'X',
-          job:   jobSet.has(e.id)  ?'Y':'X',
-          birth: birthSet.has(e.id)?'Y':'X',
-          educ:  educSet.has(e.id) ?'Y':'X',
+          ...e,branch:branchLookup[e.id]||'',email:emailLookup[e.id]||'',
+          peme:pemeSet.has(e.id)?'Y':'X',nbi:nbiSet.has(e.id)?'Y':'X',
+          job:jobSet.has(e.id)?'Y':'X',birth:birthSet.has(e.id)?'Y':'X',educ:educSet.has(e.id)?'Y':'X',
         }));
-        reqAll=records;
-        buildReqFilters();
-        reqDoFilter();
-        setAsOfDate(new Date());
-        status.className='upload-status ok';
-        status.textContent='✓ Loaded '+records.length.toLocaleString()+' employees. Saving to database…';
-        setAsOfDate(new Date());
-        const reqRecords = records.map(r=>({
-          employee_code:r.id, employee_name:r.name, employment_status:r.estat,
-          entity:r.entity, branch:r.branch, department:r.dept, section:r.sec,
-          peme:r.peme, nbi:r.nbi, job_contract:r.job, birth_cert:r.birth, proof_of_educ:r.educ
+        reqAll=records;buildReqFilters();reqDoFilter();setAsOfDate(new Date());
+        status.textContent='\u2713 Loaded '+records.length.toLocaleString()+' employees. Saving to database\u2026';
+        const reqRecords=records.map(r=>({
+          employee_code:r.id,employee_name:r.name,email:r.email,employment_status:r.estat,
+          entity:r.entity,branch:r.branch,department:r.dept,section:r.sec,
+          peme:r.peme,nbi:r.nbi,job_contract:r.job,birth_cert:r.birth,proof_of_educ:r.educ
         }));
-        supabaseSave('requirements_data', reqRecords).then(ok=>{
-          status.textContent = ok
-            ? '✓ '+records.length.toLocaleString()+' employees saved. Everyone will see updated data when they open the dashboard.'
-            : '✓ Loaded locally but could not save to database. Check your connection and try again.';
+        supabaseSave('requirements_data',reqRecords).then(ok=>{
+          status.className='upload-status ok';
+          status.textContent=ok
+            ?'\u2713 '+records.length.toLocaleString()+' employees saved. Everyone will see updated data when they open the dashboard.'
+            :'\u2713 Loaded locally but could not save to database. Check your connection and try again.';
         });
       }
     }
@@ -881,6 +862,7 @@ let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='', reqSortD
 const REQ_COLS = [
   {k:'id',    label:'Employee Code',              w:120, mono:true},
   {k:'name',  label:'Employee Name',              w:240},
+  {k:'email', label:'Email Address',             w:220},
   {k:'estat', label:'Status',                     w:100, status:true},
   {k:'entity',label:'Entity',                     w:220},
   {k:'branch',label:'Branch',                     w:110},
@@ -897,7 +879,7 @@ async function initReqs(){
   let supaReqs = await supabaseLoad('requirements_data');
   if(supaReqs && supaReqs.length > 0){
     reqAll = supaReqs.map(r=>({
-      id:r.employee_code, name:r.employee_name, estat:r.employment_status,
+      id:r.employee_code, name:r.employee_name, email:r.email||'', estat:r.employment_status,
       entity:r.entity, branch:r.branch, dept:r.department, sec:r.section,
       peme:r.peme, nbi:r.nbi, job:r.job_contract, birth:r.birth_cert, educ:r.proof_of_educ
     }));
