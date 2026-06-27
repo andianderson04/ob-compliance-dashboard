@@ -371,6 +371,11 @@ th.req-secondary-1:hover,th.req-secondary-2:hover{background:#fef08a}
       <option value="pag">Pag-IBIG missing</option>
       <option value="ph">PhilHealth missing</option>
     </select>
+    <select class="filter-sel" id="f-compstatus" onchange="doFilter()">
+      <option value="">All statuses</option>
+      <option value="COMPLETE">Complete</option>
+      <option value="INCOMPLETE">Incomplete</option>
+    </select>
     <div class="toolbar-divider"></div>
     <div class="toolbar-right">
       <span class="count-pill" id="count-pill">&mdash;</span>
@@ -779,6 +784,7 @@ function doFilter(){
   const fb=document.getElementById('f-branch').value;
   const ft=document.getElementById('f-etype').value;
   const fc=document.getElementById('f-comp').value;
+  const fcs=document.getElementById('f-compstatus').value;
   filtered=all.filter(r=>{
     if(q&&!(r.id+' '+r.name+' '+r.desig).toLowerCase().includes(q))return false;
     if(fe&&r.entity!==fe)return false;if(fd&&r.dept!==fd)return false;
@@ -787,6 +793,7 @@ function doFilter(){
     if(fc==='complete'&&(r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X'))return false;
     if(fc==='tin'&&r.tin!=='X')return false;if(fc==='sss'&&r.sss!=='X')return false;
     if(fc==='pag'&&r.pag!=='X')return false;if(fc==='ph'&&r.ph!=='X')return false;
+    if(fcs){const complete=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';if(fcs==='COMPLETE'&&!complete)return false;if(fcs==='INCOMPLETE'&&complete)return false;}
     return true;
   });
   page=1;updateKPIs();render();
