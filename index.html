@@ -170,6 +170,8 @@ tbody tr:hover td{background:#eef4fc}
 /* status pill */
 .status-pill{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:3px;font-family:var(--mono)}
 .status-active{background:#dcfce7;color:#166534}
+.comp-complete{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:3px;font-family:var(--mono);background:#dcfce7;color:#166534}
+.comp-incomplete{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:3px;font-family:var(--mono);background:#fef2f2;color:#b91c1c}
 .status-offroster{background:#fef9c3;color:#854d0e}
 .status-offdetailing{background:#e0f2fe;color:#075985}
 
@@ -474,6 +476,7 @@ const COLS = [
   {k:'sss',   label:'SSS',               w:58,  comp:true},
   {k:'pag',   label:'Pag-IBIG',          w:72,  comp:true},
   {k:'ph',    label:'PhilHealth',        w:82,  comp:true},
+  {k:'compliance_status', label:'Compliance Status', w:150, compliance_status:true},
   {k:'l1',    label:'L1 Manager',        w:185},
   {k:'l2',    label:'L2 Dept. Manager',  w:200},
   {k:'l3',    label:'L3 Division Head',  w:200},
@@ -816,6 +819,7 @@ function render(){
   document.getElementById('tbody').innerHTML=filtered.slice(s,e).map(r=>`<tr>${COLS.map(c=>{
     const v=r[c.k]||'';
     if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'✓':'✗'}</span></td>`;}
+    if(c.compliance_status){const complete=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';return `<td class="comp-cell"><span class="${complete?'comp-complete':'comp-incomplete'}">${complete?'COMPLETE':'INCOMPLETE'}</span></td>`;}
     if(c.status){
       const cls=v==='Active'?'status-active':v==='Off-Roster'?'status-offroster':'status-offdetailing';
       return `<td><span class="status-pill ${cls}">${esc(v)}</span></td>`;
@@ -837,7 +841,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 function exportXLSX(){
   const h=COLS.map(c=>c.label);
-  const d=filtered.map(r=>COLS.map(c=>{const v=r[c.k]||'';if(c.comp)return v==='Y'?'✓':'✗';return v;}));
+  const d=filtered.map(r=>COLS.map(c=>{const v=r[c.k]||'';if(c.comp)return v==='Y'?'✓':'✗';if(c.compliance_status)return(r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')?'COMPLETE':'INCOMPLETE';return v;}));
   const ws=XLSX.utils.aoa_to_sheet([h,...d]);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Compliance');
