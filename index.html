@@ -884,6 +884,7 @@ const REQ_COLS = [
   {k:'job',   label:'Job Offer & Contract',       w:155, comp:true, thClass:'req-primary-3'},
   {k:'birth', label:'Birth Certificate',          w:135, comp:true, thClass:'req-secondary-1'},
   {k:'educ',  label:'Proof of Education',         w:145, comp:true, thClass:'req-secondary-2'},
+  {k:'req_compliance_status', label:'Compliance Status',        w:150, req_compliance_status:true},
 ];
 
 async function initReqs(){
@@ -933,6 +934,11 @@ function buildReqHTML(){
       <option value="job">Job Contract missing</option>
       <option value="birth">Birth Cert missing</option>
       <option value="educ">Proof of Educ missing</option>
+    </select>
+    <select class="filter-sel" id="rf-compstatus" onchange="reqDoFilter()">
+      <option value="">All statuses</option>
+      <option value="COMPLETE">Complete</option>
+      <option value="INCOMPLETE">Incomplete</option>
     </select>
     <div class="toolbar-divider"></div>
     <div class="toolbar-right">
@@ -1012,6 +1018,7 @@ function reqDoFilter(){
   const fd=document.getElementById('rf-dept')?.value||'';
   const fs=document.getElementById('rf-estat')?.value||'';
   const fc=document.getElementById('rf-comp')?.value||'';
+  const fcs=document.getElementById('rf-compstatus')?.value||'';
   reqFiltered=reqAll.filter(r=>{
     if(q&&!(r.id+' '+r.name).toLowerCase().includes(q))return false;
     if(fe&&r.entity!==fe) return false;
@@ -1025,6 +1032,7 @@ function reqDoFilter(){
     if(fc==='job'  &&r.job  !=='X')return false;
     if(fc==='birth'&&r.birth!=='X')return false;
     if(fc==='educ' &&r.educ !=='X')return false;
+    if(fcs){const complete=r.peme==='Y'&&r.nbi==='Y'&&r.job==='Y'&&r.birth==='Y'&&r.educ==='Y';if(fcs==='COMPLETE'&&!complete)return false;if(fcs==='INCOMPLETE'&&complete)return false;}
     return true;
   });
   reqPage=1;reqUpdateKPIs();reqRender();
@@ -1057,6 +1065,7 @@ function reqRender(){
   document.getElementById('req-tbody').innerHTML=reqFiltered.slice(s,e).map(r=>`<tr>${REQ_COLS.map(c=>{
     const v=r[c.k]||'';
     if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'✓':'✗'}</span></td>`;}
+    if(c.req_compliance_status){const complete=r.peme==='Y'&&r.nbi==='Y'&&r.job==='Y'&&r.birth==='Y'&&r.educ==='Y';return `<td class="comp-cell"><span class="${complete?'comp-complete':'comp-incomplete'}">${complete?'COMPLETE':'INCOMPLETE'}</span></td>`;}
     if(c.status){const sc=v==='Active'?'status-active':v==='Off-Roster'?'status-offroster':'status-offdetailing';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
     return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
   }).join('')}</tr>`).join('');
@@ -1073,7 +1082,7 @@ function reqRender(){
 
 function exportReqXLSX(){
   const h=REQ_COLS.map(c=>c.label);
-  const d=reqFiltered.map(r=>REQ_COLS.map(c=>{const v=r[c.k]||'';if(c.comp)return v==='Y'?'✓':'✗';return v;}));
+  const d=reqFiltered.map(r=>REQ_COLS.map(c=>{const v=r[c.k]||'';if(c.comp)return v==='Y'?'✓':'✗';if(c.req_compliance_status)return(r.peme==='Y'&&r.nbi==='Y'&&r.job==='Y'&&r.birth==='Y'&&r.educ==='Y')?'COMPLETE':'INCOMPLETE';return v;}));
   const ws=XLSX.utils.aoa_to_sheet([h,...d]);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Requirements');
@@ -1166,11 +1175,11 @@ async function supabaseLoadMeta(table){
 
 function setAsOfDate(date){
   const d = date || new Date();
-  const opts = {year:'numeric', month:'long', day:'numeric'};
-  const formatted = d.toLocaleDateString('en-PH', opts);
+  const dateOpts = {year:'numeric', month:'long', day:'numeric'};
+  const hour = d.toLocaleTimeString('en-PH', {hour:'numeric', hour12:true}).replace(':00','');
+  const formatted = d.toLocaleDateString('en-PH', dateOpts) + ' at ' + hour;
   document.getElementById('asof-date').textContent = formatted;
   document.getElementById('header-asof').style.display = 'block';
-  // persist in sessionStorage so refresh keeps it
   if(date) sessionStorage.setItem('asof', d.toISOString());
 }
 // restore from session if available
