@@ -664,7 +664,7 @@ function processFile(buffer,status){
             if(bankRaw===''||bankRaw==='0'){
               bankRecords.push({
                 id:obj.id, name:obj.name, email:obj.email, estat:obj.estat, etype:obj.etype,
-                branch:obj.branch, entity:obj.entity, dept:obj.dept, sec:obj.sec, bankMissing:true
+                branch:obj.branch, entity:obj.entity, dept:obj.dept, sec:obj.sec, doj:obj.doj, bankMissing:true
               });
             }
           }
@@ -694,7 +694,8 @@ function processFile(buffer,status){
           .map(r => ({
             employee_code:r.id, employee_name:r.name, email:r.email,
             employment_status:r.estat, employment_type:r.etype,
-            branch:r.branch, entity:r.entity, department:r.dept, section:r.sec
+            branch:r.branch, entity:r.entity, department:r.dept, section:r.sec,
+            date_of_joining:r.doj
           }));
         Promise.all([
           supabaseSave('statutory_data', statRecords),
@@ -703,7 +704,7 @@ function processFile(buffer,status){
           payAll = noBankRecords.map(r=>({
             id:r.employee_code, name:r.employee_name, email:r.email,
             estat:r.employment_status, etype:r.employment_type,
-            branch:r.branch, entity:r.entity, dept:r.department, sec:r.section
+            branch:r.branch, entity:r.entity, dept:r.department, sec:r.section, doj:r.date_of_joining
           }));
           if(document.getElementById('section-payroll').innerHTML!=='') { buildPayFilters(); payDoFilter(); }
           status.textContent = (statOk && payOk)
@@ -1311,6 +1312,7 @@ const PAY_COLS = [
   {k:'entity',label:'Entity',            w:220},
   {k:'dept',  label:'Department',        w:160},
   {k:'sec',   label:'Section',           w:130},
+  {k:'doj',   label:'Date of Joining',    w:120, mono:true},
   {k:'payroll_status', label:'Payroll Account', w:180, payroll_status:true},
 ];
 
@@ -1320,7 +1322,7 @@ async function initPayroll(){
     payAll = supaPay.map(r=>({
       id:r.employee_code, name:r.employee_name, email:r.email,
       estat:r.employment_status, etype:r.employment_type,
-      branch:r.branch, entity:r.entity, dept:r.department, sec:r.section
+      branch:r.branch, entity:r.entity, dept:r.department, sec:r.section, doj:r.date_of_joining
     }));
   } else {
     const json = await decompress(PAYROLL_B64);
