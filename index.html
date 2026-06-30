@@ -5,6 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<meta name="dashboard-version" content="20260630055717">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TA-Onboarding Compliance Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1484,6 +1485,22 @@ function setAsOfDate(date){
 // restore from session if available
 const _saved = sessionStorage.getItem('asof');
 if(_saved) { window.addEventListener('DOMContentLoaded', ()=>setAsOfDate(new Date(_saved))); }
+
+/* ── AUTO-RELOAD ON NEW VERSION ── */
+const CURRENT_VERSION = '20260630055717';
+async function checkForUpdate(){
+  try{
+    const res = await fetch(window.location.href.split('?')[0] + '?_=' + Date.now(), {cache:'no-store'});
+    const html = await res.text();
+    const match = html.match(/<meta name="dashboard-version" content="(\d+)">/);
+    if(match && match[1] !== CURRENT_VERSION){
+      console.log('New dashboard version detected, reloading...');
+      window.location.reload(true);
+    }
+  }catch(e){ /* silent fail, network issue etc */ }
+}
+// Check every 60 seconds for a newer version
+setInterval(checkForUpdate, 60000);
 
 init();
 </script>
