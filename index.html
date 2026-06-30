@@ -180,6 +180,7 @@ tbody tr:hover td{background:#eef4fc}
 .bank-other{background:#e5e7eb;color:#374151}
 .bank-pending{background:#fef9c3;color:#854d0e}
 .bank-none{background:#fef2f2;color:#b91c1c}
+.payroll-pending{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:3px;font-family:var(--mono);background:#fef2f2;color:#b91c1c}
 .status-offroster{background:#fef9c3;color:#854d0e}
 .status-offdetailing{background:#e0f2fe;color:#075985}
 
@@ -1309,6 +1310,7 @@ const PAY_COLS = [
   {k:'entity',label:'Entity',            w:220},
   {k:'dept',  label:'Department',        w:160},
   {k:'sec',   label:'Section',           w:130},
+  {k:'payroll_status', label:'Payroll Account', w:180, payroll_status:true},
 ];
 
 async function initPayroll(){
@@ -1446,6 +1448,7 @@ function payRender(){
   const s=(payPage-1)*payPerPage,e=Math.min(s+payPerPage,payFiltered.length);
   document.getElementById('pay-tbody').innerHTML=payFiltered.slice(s,e).map(r=>`<tr>${PAY_COLS.map(c=>{
     const v=r[c.k]||'';
+    if(c.payroll_status){return `<td class="comp-cell"><span class="payroll-pending">Pending Payroll Account</span></td>`;}
     if(c.status){const sc=v==='Active'?'status-active':v==='Off-Roster'?'status-offroster':'status-offdetailing';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
     return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
   }).join('')}</tr>`).join('');
@@ -1462,7 +1465,7 @@ function payRender(){
 
 function exportPayXLSX(){
   const h=PAY_COLS.map(c=>c.label);
-  const d=payFiltered.map(r=>PAY_COLS.map(c=>r[c.k]||''));
+  const d=payFiltered.map(r=>PAY_COLS.map(c=>c.payroll_status ? 'Pending Payroll Account' : (r[c.k]||'')));
   const ws=XLSX.utils.aoa_to_sheet([h,...d]);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'RCBC Payroll');
