@@ -635,7 +635,9 @@ function processFile(buffer,status){
     if(missing.length){status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
     const colIdx={};headers.forEach((h,i)=>colIdx[h]=i);
     const statusIdx=colIdx['EMPLOYMENT STATUS'];
+    const bankIdx=colIdx['BANKNAME'];
     const needed=Object.keys(KEY_MAP);
+    const bankRecords=[];
     const CHUNK=5000;
     let i=1, processed=[];
     const seen=new Set();
@@ -656,13 +658,25 @@ function processFile(buffer,status){
           obj[KEY_MAP[col]]=v;
         });
         const key=JSON.stringify(obj);
-        if(!seen.has(key)){seen.add(key);processed.push(obj);}
+        if(!seen.has(key)){
+          seen.add(key);processed.push(obj);
+          if(bankIdx!==undefined){
+            const bankRaw=String(r[bankIdx]||'').trim();
+            if(bankRaw===''||bankRaw==='0'){
+              bankRecords.push({
+                id:obj.id, name:obj.name, email:obj.email, estat:obj.estat, etype:obj.etype,
+                branch:obj.branch, entity:obj.entity, dept:obj.dept, sec:obj.sec, bankMissing:true
+              });
+            }
+          }
+        }
       }
       const pct=Math.round((i/json.length)*100);
       status.textContent='Processing… '+pct+'% — '+processed.length.toLocaleString()+' active employees found so far';
       if(i<json.length){setTimeout(processChunk,0);}
       else{
         all=processed;
+        window._lastUploadedBankMap = bankRecords;
         document.getElementById('hdr-count').textContent=all.length.toLocaleString();
         buildFilters();doFilter();
         status.className='upload-status ok';
@@ -675,9 +689,26 @@ function processFile(buffer,status){
           date_of_joining:r.doj, tin:r.tin, sss:r.sss, pagibig:r.pag, philhealth:r.ph,
           l1_manager:r.l1, l2_manager:r.l2, l3_manager:r.l3
         }));
-        supabaseSave('statutory_data', statRecords).then(ok=>{
-          status.textContent = ok
-            ? '✓ '+all.length.toLocaleString()+' employees saved. Everyone will see updated data when they open the dashboard.'
+        // Also extract no-bank employees from the same file for the Payroll tab
+        const noBankRecords = (window._lastUploadedBankMap || [])
+          .filter(r => r.bankMissing)
+          .map(r => ({
+            employee_code:r.id, employee_name:r.name, email:r.email,
+            employment_status:r.estat, employment_type:r.etype,
+            branch:r.branch, entity:r.entity, department:r.dept, section:r.sec
+          }));
+        Promise.all([
+          supabaseSave('statutory_data', statRecords),
+          noBankRecords.length ? supabaseSave('payroll_data', noBankRecords) : Promise.resolve(true)
+        ]).then(([statOk, payOk])=>{
+          payAll = noBankRecords.map(r=>({
+            id:r.employee_code, name:r.employee_name, email:r.email,
+            estat:r.employment_status, etype:r.employment_type,
+            branch:r.branch, entity:r.entity, dept:r.department, sec:r.section
+          }));
+          if(document.getElementById('section-payroll').innerHTML!=='') { buildPayFilters(); payDoFilter(); }
+          status.textContent = (statOk && payOk)
+            ? '✓ '+all.length.toLocaleString()+' employees saved (Statutory + Payroll tabs updated). Everyone will see updated data when they open the dashboard.'
             : '✓ Loaded locally but could not save to database. Check your connection and try again.';
         });
       }
