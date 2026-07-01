@@ -692,13 +692,12 @@ function processFile(buffer,status){
   try{
     status.textContent='Parsing spreadsheet…';
     status.textContent='Parsing file (20-30 seconds for large files)\u2026';
-    // Copy buffer first so it stays usable
-    const bufCopy = buffer.slice(0);
-    const wb=XLSX.read(new Uint8Array(bufCopy),{type:'array',raw:false,cellDates:false,dense:false});
+    const wb=XLSX.read(new Uint8Array(buffer),{type:'array',raw:false,cellDates:false});
+    if(!wb||!wb.SheetNames||!wb.SheetNames.length){status.className='upload-status err';status.textContent='Could not open workbook. Ensure the file is a valid .xlsx file.';return;}
     const ws=wb.Sheets[wb.SheetNames[0]];
-    if(!ws){status.className='upload-status err';status.textContent='Could not read sheet. Try re-downloading the file and uploading again.';return;}
-    const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-    if(!rawRows||rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    if(!ws){status.className='upload-status err';status.textContent='Workbook has no sheets.';return;}
+    const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(!rawRows||rawRows.length<2){status.className='upload-status err';status.textContent='Sheet appears empty.';return;}
     const headers=rawRows[0].map(h=>String(h||'').trim());
     const required=['EMPLOYEECODE','EMPLOYMENT STATUS','TIN','SSS NUMBER','PAGIBIG NUMBER','PHILHEALTH NUMBER'];
     const missing=required.filter(col=>!headers.includes(col));
@@ -783,10 +782,10 @@ function processReqFile(buffer,status){
   try{
     status.textContent='Parsing requirements spreadsheet…';
     status.textContent='Parsing requirements file (may take up to 30 seconds)\u2026';
-    const bufCopy=buffer.slice(0);
-    const wb=XLSX.read(new Uint8Array(bufCopy),{type:'array',raw:false,cellDates:false,dense:false});
+    const wb=XLSX.read(new Uint8Array(buffer),{type:'array',raw:false,cellDates:false});
+    if(!wb||!wb.SheetNames||!wb.SheetNames.length){status.className='upload-status err';status.textContent='Could not open workbook.';return;}
     const ws=wb.Sheets[wb.SheetNames[0]];
-    if(!ws){status.className='upload-status err';status.textContent='Could not read sheet.';return;}
+    if(!ws){status.className='upload-status err';status.textContent='Workbook has no sheets.';return;}
     const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
     if(rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
     const headers=rawRows[0].map(h=>String(h||'').trim());
