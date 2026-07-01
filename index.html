@@ -752,7 +752,7 @@ function processReqFile(buffer, status){
             entity:String(r['Entity']||'').trim(),
             dept:String(r['Department']||'').trim(),
             sec:String(r['Section']||'').trim(),
-            email:'',
+            email:'', desig:'', doj:'',
           };
         }
         const dtype=String(r['DOCUMENT TYPE']||'').trim();
@@ -765,13 +765,16 @@ function processReqFile(buffer, status){
       status.textContent='Processing\u2026 '+Math.round((i/jsonObj.length)*100)+'%';
       if(i<jsonObj.length){setTimeout(pass1Chunk,0);}
       else{
-        const branchLookup={}, emailLookup={};
+        const branchLookup={}, emailLookup={}, desigLookup={}, dojLookup={};
         all.forEach(r=>{
           if(r.id&&r.branch) branchLookup[r.id]=r.branch;
           if(r.id&&r.email)  emailLookup[r.id]=r.email;
+          if(r.id&&r.desig)  desigLookup[r.id]=r.desig;
+          if(r.id&&r.doj)    dojLookup[r.id]=r.doj;
         });
         const records=Object.values(empInfo).map(e=>({
           ...e,branch:branchLookup[e.id]||'',email:emailLookup[e.id]||'',
+          desig:desigLookup[e.id]||'',doj:dojLookup[e.id]||'',
           peme:pemeSet.has(e.id)?'Y':'X',nbi:nbiSet.has(e.id)?'Y':'X',
           job:jobSet.has(e.id)?'Y':'X',birth:birthSet.has(e.id)?'Y':'X',educ:educSet.has(e.id)?'Y':'X',
         }));
@@ -780,6 +783,8 @@ function processReqFile(buffer, status){
         const reqRecords=records.map(r=>({
           employee_code:r.id,employee_name:r.name,email:r.email,employment_status:r.estat,
           entity:r.entity,branch:r.branch,department:r.dept,section:r.sec,
+          designation:r.desig,date_of_joining:r.doj,
+          designation:r.desig,date_of_joining:r.doj,
           peme:r.peme,nbi:r.nbi,job_contract:r.job,birth_cert:r.birth,proof_of_educ:r.educ
         }));
         supabaseSave('requirements_data',reqRecords).then(ok=>{
@@ -1004,6 +1009,8 @@ const REQ_COLS = [
   {k:'branch',label:'Branch',                     w:110},
   {k:'dept',  label:'Department',                 w:165},
   {k:'sec',   label:'Section',                    w:130},
+  {k:'desig', label:'Designation',                w:200},
+  {k:'doj',   label:'Date of Joining',            w:120, mono:true},
   {k:'peme',  label:'PEME Completion',            w:130, comp:true, thClass:'req-primary-1'},
   {k:'nbi',   label:'NBI Clearance',              w:115, comp:true, thClass:'req-primary-2'},
   {k:'job',   label:'Job Offer & Contract',       w:155, comp:true, thClass:'req-primary-3'},
@@ -1018,6 +1025,8 @@ async function initReqs(){
     reqAll = supaReqs.map(r=>({
       id:r.employee_code, name:r.employee_name, email:r.email||'', estat:r.employment_status,
       entity:r.entity, branch:r.branch, dept:r.department, sec:r.section,
+      desig:r.designation||'', doj:r.date_of_joining||'',
+      desig:r.designation||'', doj:r.date_of_joining||'',
       peme:r.peme, nbi:r.nbi, job:r.job_contract, birth:r.birth_cert, educ:r.proof_of_educ
     }));
   } else {
