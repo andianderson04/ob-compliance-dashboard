@@ -455,7 +455,14 @@ async function init() {
   all = JSON.parse(json);
   document.getElementById('loading-screen').style.display='none';
   const appEl=document.getElementById('app');appEl.style.display='flex';
+  // Ensure statutory tab is active and shared section visible
+  document.getElementById('section-statutory').style.display='';
+  document.getElementById('section-requirements').style.display='none';
+  document.getElementById('section-payroll').style.display='none';
+  document.getElementById('section-shared').style.display='flex';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
+  // Clear thead before building to avoid duplicates
+  document.getElementById('thead-row').innerHTML='';
   buildFilters(); buildHead(); doFilter();
   initReqs();
   initPayroll();
