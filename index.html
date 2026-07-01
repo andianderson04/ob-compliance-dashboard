@@ -690,29 +690,24 @@ function handleFileUpload(file){
 
 function processFile(buffer,status){
   try{
-    status.textContent='Parsing spreadsheet…';
-    status.textContent='Parsing file (20-30 seconds for large files)\u2026';
-    const wb=XLSX.read(buffer,{type:'binary',raw:false,cellDates:false});
-    if(!wb||!wb.SheetNames||!wb.SheetNames.length){status.className='upload-status err';status.textContent='Could not open workbook. Ensure the file is a valid .xlsx file.';return;}
+    status.textContent='Parsing spreadsheet\u2026';
+    const wb=XLSX.read(buffer,{type:'array',cellDates:true,dense:true});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    if(!ws){status.className='upload-status err';status.textContent='Workbook has no sheets.';return;}
-    const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-    if(!rawRows||rawRows.length<2){status.className='upload-status err';status.textContent='Sheet appears empty.';return;}
-    const headers=rawRows[0].map(h=>String(h||'').trim());
+    if(!ws){status.className='upload-status err';status.textContent='Could not read sheet.';return;}
+    const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+    if(!json||json.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    const headers=json[0].map(h=>String(h||'').trim());
     const required=['EMPLOYEECODE','EMPLOYMENT STATUS','TIN','SSS NUMBER','PAGIBIG NUMBER','PHILHEALTH NUMBER'];
     const missing=required.filter(col=>!headers.includes(col));
     if(missing.length){status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
-    const ci={};headers.forEach((h,idx)=>ci[h]=idx);
-    const bankIdx=ci['BANKNAME'];
-    const statIdx=ci['EMPLOYMENT STATUS'];
-    const ecodeIdx=ci['EMPLOYEECODE'];
-    status.textContent='Processing '+( rawRows.length-1).toLocaleString()+' rows\u2026';
+    const ci={};headers.forEach((h,i)=>{ci[h]=i;});
+    const statIdx=ci['EMPLOYMENT STATUS'],ecodeIdx=ci['EMPLOYEECODE'],bankIdx=ci['BANKNAME'];
+    status.textContent='Processing\u2026 0%';
     const CHUNK=5000;let i=1;const processed=[];const bankRecords=[];const seen=new Set();
     function chunkProcess(){
-      const end=Math.min(i+CHUNK,rawRows.length);
+      const end=Math.min(i+CHUNK,json.length);
       for(;i<end;i++){
-        const row=rawRows[i];
-        if(!row||!row.length)continue;
+        const row=json[i];if(!row||!row.some(x=>x!==''))continue;
         const estat=String(row[statIdx]||'').trim();
         if(!VALID_STATUSES.includes(estat))continue;
         const ecode=String(row[ecodeIdx]||'').trim();
@@ -737,47 +732,50 @@ function processFile(buffer,status){
           }
         }
       }
-      status.textContent='Processing… '+Math.round((i/jsonObj.length)*100)+'%';
-      if(i<jsonObj.length){setTimeout(chunkProcess,0);return;}
+      status.textContent='Processing\u2026 '+Math.round((i/json.length)*100)+'%';
+      if(i<json.length){setTimeout(chunkProcess,0);return;}
       all=processed;
       window._lastUploadedBankMap=bankRecords;
       document.getElementById('hdr-count').textContent=all.length.toLocaleString();
       document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
       buildFilters();doFilter();setAsOfDate(new Date());
-      status.textContent='✓ Loaded '+all.length.toLocaleString()+' employees. Saving to database…';
-      const statRecords=all.map(r=>(({
+      status.textContent='\u2713 Loaded '+all.length.toLocaleString()+' employees. Saving to database\u2026';
+      const statRecords=all.map(r=>({
         employee_code:r.id,employee_name:r.name,email:r.email,
         employment_status:r.estat,employment_type:r.etype,designation:r.desig,
         branch:r.branch,entity:r.entity,department:r.dept,section:r.sec,
         date_of_joining:r.doj,tin:r.tin,sss:r.sss,pagibig:r.pag,philhealth:r.ph,
         l1_manager:r.l1,l2_manager:r.l2,l3_manager:r.l3
-      })));
-      const noBankRecords=(window._lastUploadedBankMap||[]).filter(r=>r.bankMissing).map(r=>(({
+      }));
+      const noBankRecords=(window._lastUploadedBankMap||[]).filter(r=>r.bankMissing).map(r=>({
         employee_code:r.id,employee_name:r.name,email:r.email,
         employment_status:r.estat,employment_type:r.etype,
         branch:r.branch,entity:r.entity,department:r.dept,section:r.sec,date_of_joining:r.doj
-      })));
+      }));
       Promise.all([
         supabaseSave('statutory_data',statRecords),
         noBankRecords.length?supabaseSave('payroll_data',noBankRecords):Promise.resolve(true)
       ]).then(([statOk,payOk])=>{
-        payAll=noBankRecords.map(r=>(({
+        payAll=noBankRecords.map(r=>({
           id:r.employee_code,name:r.employee_name,email:r.email,
           estat:r.employment_status,etype:r.employment_type,
           branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining
-        })));
+        }));
         document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
         if(currentTab==='payroll'){buildPayFilters();payDoFilter();}
         status.className='upload-status ok';
         status.textContent=(statOk&&payOk)
-          ?'✓ '+all.length.toLocaleString()+' employees saved. Statutory + Payroll tabs updated.'
-          :'✓ Loaded locally but could not save to database.';
+          ?'\u2713 '+all.length.toLocaleString()+' employees saved. Statutory + Payroll tabs updated.'
+          :'\u2713 Loaded locally but could not save to database.';
       });
     }
     setTimeout(chunkProcess,0);
-  }catch(err){status.className='upload-status err';status.textContent='Could not read file.';}
+  }catch(err){
+    console.error(err);
+    status.className='upload-status err';
+    status.textContent='Error: '+err.message;
+  }
 }
-
 function processReqFile(buffer,status){
   try{
     status.textContent='Parsing requirements spreadsheet…';
