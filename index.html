@@ -691,26 +691,22 @@ function handleFileUpload(file){
 function processFile(buffer,status){
   try{
     status.textContent='Parsing spreadsheet…';
-    // Parse only first row to get headers, then use sheet range for data
-    status.textContent='Reading file structure\u2026';
-    const wbH=XLSX.read(buffer,{type:'array',sheetRows:1});
-    const wsH=wbH.Sheets[wbH.SheetNames[0]];
-    const headerRow=XLSX.utils.sheet_to_json(wsH,{header:1,defval:''})[0]||[];
-    const headers=headerRow.map(h=>String(h||'').trim());
-    if(headers.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    status.textContent='Parsing file (20-30 seconds for large files)\u2026';
+    // Copy buffer first so it stays usable
+    const bufCopy = buffer.slice(0);
+    const wb=XLSX.read(new Uint8Array(bufCopy),{type:'array',raw:false,cellDates:false,dense:false});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    if(!ws){status.className='upload-status err';status.textContent='Could not read sheet. Try re-downloading the file and uploading again.';return;}
+    const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+    if(!rawRows||rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    const headers=rawRows[0].map(h=>String(h||'').trim());
     const required=['EMPLOYEECODE','EMPLOYMENT STATUS','TIN','SSS NUMBER','PAGIBIG NUMBER','PHILHEALTH NUMBER'];
-    const missing=required.filter(c=>!headers.includes(c));
+    const missing=required.filter(col=>!headers.includes(col));
     if(missing.length){status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
     const ci={};headers.forEach((h,idx)=>ci[h]=idx);
     const bankIdx=ci['BANKNAME'];
     const statIdx=ci['EMPLOYMENT STATUS'];
     const ecodeIdx=ci['EMPLOYEECODE'];
-    // Now parse full file
-    status.textContent='Parsing full file (this may take 20-30 seconds)\u2026';
-    const wb=XLSX.read(buffer,{type:'array',raw:false,cellDates:false});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-    if(rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
     status.textContent='Processing '+( rawRows.length-1).toLocaleString()+' rows\u2026';
     const CHUNK=5000;let i=1;const processed=[];const bankRecords=[];const seen=new Set();
     function chunkProcess(){
@@ -786,9 +782,11 @@ function processFile(buffer,status){
 function processReqFile(buffer,status){
   try{
     status.textContent='Parsing requirements spreadsheet…';
-    status.textContent='Parsing requirements file\u2026';
-    const wb=XLSX.read(buffer,{type:'array',raw:false,cellDates:false});
+    status.textContent='Parsing requirements file (may take up to 30 seconds)\u2026';
+    const bufCopy=buffer.slice(0);
+    const wb=XLSX.read(new Uint8Array(bufCopy),{type:'array',raw:false,cellDates:false,dense:false});
     const ws=wb.Sheets[wb.SheetNames[0]];
+    if(!ws){status.className='upload-status err';status.textContent='Could not read sheet.';return;}
     const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
     if(rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
     const headers=rawRows[0].map(h=>String(h||'').trim());
