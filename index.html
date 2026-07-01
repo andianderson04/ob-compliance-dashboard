@@ -449,9 +449,20 @@ async function decompress(b64) {
 }
 
 async function init() {
-  // Try Supabase first
-  document.getElementById('loading-label').textContent='Loading latest data…';
-  let supaData = await supabaseLoad('statutory_data');
+  document.getElementById('loading-label').textContent='Loading data…';
+
+  // Start decompressing embedded data immediately in background
+  const embeddedPromise = decompress(EMBEDDED_B64).then(json=>JSON.parse(json));
+
+  // Race: Supabase vs 4-second timeout, fallback to embedded
+  let supaData = null;
+  try {
+    supaData = await Promise.race([
+      supabaseLoad('statutory_data'),
+      new Promise(resolve=>setTimeout(()=>resolve(null), 4000))
+    ]);
+  } catch(e){ supaData = null; }
+
   if(supaData && supaData.length > 0){
     all = supaData.map(r=>({
       id:r.employee_code, name:r.employee_name, email:r.email,
@@ -460,14 +471,13 @@ async function init() {
       doj:r.date_of_joining, tin:r.tin, sss:r.sss, pag:r.pagibig, ph:r.philhealth,
       l1:r.l1_manager, l2:r.l2_manager, l3:r.l3_manager
     }));
-    const meta = await supabaseLoadMeta('statutory_data');
-    if(meta) setAsOfDate(meta);
+    supabaseLoadMeta('statutory_data').then(meta=>{ if(meta) setAsOfDate(meta); });
   } else {
-    // Fall back to embedded data
-    const json=await decompress(EMBEDDED_B64);
-    all=JSON.parse(json);
+    // Use embedded data (already decompressing in background)
+    all = await embeddedPromise;
     setAsOfDate();
   }
+
   document.getElementById('loading-screen').style.display='none';
   const appEl=document.getElementById('app');appEl.style.display='flex';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
@@ -989,7 +999,10 @@ const REQ_COLS = [
 ];
 
 async function initReqs(){
-  let supaReqs = await supabaseLoad('requirements_data');
+  let supaReqs = await Promise.race([
+    supabaseLoad('requirements_data'),
+    new Promise(resolve=>setTimeout(()=>resolve(null),4000))
+  ]);
   if(supaReqs && supaReqs.length > 0){
     reqAll = supaReqs.map(r=>({
       id:r.employee_code, name:r.employee_name, email:r.email||'', estat:r.employment_status,
@@ -1244,22 +1257,24 @@ async function supabaseSave(table, records){
 
 async function supabaseLoad(table){
   try{
+    const controller = new AbortController();
+    const timeout = setTimeout(()=>controller.abort(), 5000); // 5s timeout
     let records=[], offset=0;
     const LIMIT=1000;
     while(true){
       const res = await fetch(
         `${SUPA_URL}/rest/v1/${table}?select=*&limit=${LIMIT}&offset=${offset}`,
-        {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}
+        {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}, signal:controller.signal}
       );
-      if(!res.ok) return null;
+      if(!res.ok){clearTimeout(timeout);return null;}
       const batch = await res.json();
       records = records.concat(batch);
-      if(batch.length < LIMIT) break;
+      if(batch.length < LIMIT){clearTimeout(timeout);break;}
       offset += LIMIT;
     }
     return records.length > 0 ? records : null;
   } catch(e){
-    console.error('Supabase load error:',e);
+    console.error('Supabase load error:',e.name==='AbortError'?'Timeout — falling back to embedded data':e);
     return null;
   }
 }
@@ -1295,7 +1310,10 @@ const PAY_COLS = [
 ];
 
 async function initPayroll(){
-  let supaPay = await supabaseLoad('payroll_data');
+  let supaPay = await Promise.race([
+    supabaseLoad('payroll_data'),
+    new Promise(resolve=>setTimeout(()=>resolve(null),4000))
+  ]);
   if(supaPay && supaPay.length > 0){
     payAll = supaPay.map(r=>({
       id:r.employee_code, name:r.employee_name, email:r.email,
