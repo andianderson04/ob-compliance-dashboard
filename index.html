@@ -691,28 +691,36 @@ function handleFileUpload(file){
 function processFile(buffer,status){
   try{
     status.textContent='Parsing spreadsheet…';
-    const wb=XLSX.read(buffer,{type:'array',raw:true});
+    const wb=XLSX.read(buffer,{type:'array',raw:true,dense:false});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const jsonObj=XLSX.utils.sheet_to_json(ws,{defval:''});
-    if(jsonObj.length<1){status.className='upload-status err';status.textContent='File appears empty.';return;}
-    const headers=Object.keys(jsonObj[0]);
+    status.textContent='Parsing rows\u2026';
+    const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+    if(rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    const headers=rawRows[0].map(h=>String(h||'').trim());
     const required=['EMPLOYEECODE','EMPLOYMENT STATUS','TIN','SSS NUMBER','PAGIBIG NUMBER','PHILHEALTH NUMBER'];
     const missing=required.filter(c=>!headers.includes(c));
     if(missing.length){status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
-    const bankIdx=headers.indexOf('BANKNAME');
-    const CHUNK=8000;let i=0;const processed=[];const bankRecords=[];const seen=new Set();
+    const ci={};headers.forEach((h,i)=>ci[h]=i);
+    const bankIdx=ci['BANKNAME'];
+    const statIdx=ci['EMPLOYMENT STATUS'];
+    const ecodeIdx=ci['EMPLOYEECODE'];
+    status.textContent='Filtering '+( rawRows.length-1).toLocaleString()+' rows\u2026';
+    const CHUNK=5000;let i=1;const processed=[];const bankRecords=[];const seen=new Set();
     function chunkProcess(){
-      const end=Math.min(i+CHUNK,jsonObj.length);
+      const end=Math.min(i+CHUNK,rawRows.length);
       for(;i<end;i++){
-        const r=jsonObj[i];
-        const estat=String(r['EMPLOYMENT STATUS']||'').trim();
+        const row=rawRows[i];
+        if(!row||!row.length)continue;
+        const estat=String(row[statIdx]||'').trim();
         if(!VALID_STATUSES.includes(estat))continue;
-        const ecode=String(r['EMPLOYEECODE']||'').trim();
+        const ecode=String(row[ecodeIdx]||'').trim();
         if(!ecode||!/^\d+$/.test(ecode))continue;
+        const r={};
+        headers.forEach((h,idx)=>{ r[h]=String(row[idx]||'').trim(); });
         const obj={};
         Object.keys(KEY_MAP).forEach(col=>{
-          if(r[col]===undefined){obj[KEY_MAP[col]]='';return;}
-          let v=String(r[col]||'').trim();
+          if(ci[col]===undefined){obj[KEY_MAP[col]]='';return;}
+          let v=String(row[ci[col]]||'').trim();
           if(COMP_COLS.includes(col))v=(v===''||v==='0')?'X':'Y';
           if(col==='DATE OF JOINING'&&v){const d=new Date(v);if(!isNaN(d))v=d.toISOString().slice(0,10);}
           obj[KEY_MAP[col]]=v;
@@ -720,8 +728,8 @@ function processFile(buffer,status){
         const key=JSON.stringify(obj);
         if(!seen.has(key)){
           seen.add(key);processed.push(obj);
-          if(bankIdx>=0){
-            const bankRaw=String(r['BANKNAME']||'').trim();
+          if(bankIdx!==undefined){
+            const bankRaw=String(row[bankIdx]||'').trim();
             if(bankRaw===''||bankRaw==='0')bankRecords.push({
               id:obj.id,name:obj.name,email:obj.email,estat:obj.estat,etype:obj.etype,
               branch:obj.branch,entity:obj.entity,dept:obj.dept,sec:obj.sec,doj:obj.doj,bankMissing:true
@@ -773,26 +781,33 @@ function processFile(buffer,status){
 function processReqFile(buffer,status){
   try{
     status.textContent='Parsing requirements spreadsheet…';
-    const wb=XLSX.read(buffer,{type:'array',raw:true});
+    const wb=XLSX.read(buffer,{type:'array',raw:true,dense:false});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const jsonObj=XLSX.utils.sheet_to_json(ws,{defval:''});
-    if(jsonObj.length<1){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    status.textContent='Parsing rows\u2026';
+    const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+    if(rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    const headers=rawRows[0].map(h=>String(h||'').trim());
+    const ci={};headers.forEach((h,idx)=>ci[h]=idx);
     const VALID=new Set(VALID_STATUSES);
     const PEME_S=new Set(PEME_TYPES),NBI_S=new Set(NBI_TYPES),JOB_S=new Set(JOB_TYPES),BIRTH_S=new Set(BIRTH_TYPES),EDUC_S=new Set(EDUC_TYPES);
     const empInfo={},pemeSet=new Set,nbiSet=new Set,jobSet=new Set,birthSet=new Set,educSet=new Set;
-    const CHUNK=8000;let i=0;
+    status.textContent='Filtering '+(rawRows.length-1).toLocaleString()+' rows\u2026';
+    const CHUNK=5000;let i=1;
     function chunkProcess(){
-      const end=Math.min(i+CHUNK,jsonObj.length);
+      const end=Math.min(i+CHUNK,rawRows.length);
       for(;i<end;i++){
-        const r=jsonObj[i];
-        const estat=String(r['EMPLOYMENT STATUS']||'').trim();
+        const row=rawRows[i];
+        if(!row||!row.length)continue;
+        const estat=String(row[ci['EMPLOYMENT STATUS']]||'').trim();
         if(!VALID.has(estat))continue;
-        const ecode=String(r['EMPLOYEECODE']||'').trim();
+        const ecode=String(row[ci['EMPLOYEECODE']]||'').trim();
         if(!ecode||!/^\d+$/.test(ecode))continue;
-        if(!empInfo[ecode])empInfo[ecode]={id:ecode,name:String(r['EMPLOYEE NAME']||'').trim(),estat,
-          entity:String(r['Entity']||'').trim(),dept:String(r['Department']||'').trim(),
-          sec:String(r['Section']||'').trim(),email:'',desig:'',doj:''};
-        const dtype=String(r['DOCUMENT TYPE']||'').trim();
+        if(!empInfo[ecode])empInfo[ecode]={id:ecode,
+          name:String(row[ci['EMPLOYEE NAME']]||'').trim(),estat,
+          entity:String(row[ci['Entity']]||'').trim(),
+          dept:String(row[ci['Department']]||'').trim(),
+          sec:String(row[ci['Section']]||'').trim(),email:'',desig:'',doj:''};
+        const dtype=String(row[ci['DOCUMENT TYPE']]||'').trim();
         if(PEME_S.has(dtype))pemeSet.add(ecode);if(NBI_S.has(dtype))nbiSet.add(ecode);
         if(JOB_S.has(dtype))jobSet.add(ecode);if(BIRTH_S.has(dtype))birthSet.add(ecode);
         if(EDUC_S.has(dtype))educSet.add(ecode);
