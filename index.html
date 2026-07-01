@@ -449,882 +449,105 @@ async function decompress(b64) {
 }
 
 async function init() {
+  // Step 1: Show embedded data immediately — no waiting
   document.getElementById('loading-label').textContent='Loading data…';
-
-  // Start decompressing embedded data immediately in background
-  const embeddedPromise = decompress(EMBEDDED_B64).then(json=>JSON.parse(json));
-
-  // Race: Supabase vs 4-second timeout, fallback to embedded
-  let supaData = null;
-  try {
-    supaData = await Promise.race([
-      supabaseLoad('statutory_data'),
-      new Promise(resolve=>setTimeout(()=>resolve(null), 4000))
-    ]);
-  } catch(e){ supaData = null; }
-
-  if(supaData && supaData.length > 0){
-    all = supaData.map(r=>({
-      id:r.employee_code, name:r.employee_name, email:r.email,
-      estat:r.employment_status, etype:r.employment_type, desig:r.designation,
-      branch:r.branch, entity:r.entity, dept:r.department, sec:r.section,
-      doj:r.date_of_joining, tin:r.tin, sss:r.sss, pag:r.pagibig, ph:r.philhealth,
-      l1:r.l1_manager, l2:r.l2_manager, l3:r.l3_manager
-    }));
-    supabaseLoadMeta('statutory_data').then(meta=>{ if(meta) setAsOfDate(meta); });
-  } else {
-    // Use embedded data (already decompressing in background)
-    all = await embeddedPromise;
-    setAsOfDate();
-  }
-
+  const json = await decompress(EMBEDDED_B64);
+  all = JSON.parse(json);
   document.getElementById('loading-screen').style.display='none';
   const appEl=document.getElementById('app');appEl.style.display='flex';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
   buildFilters(); buildHead(); doFilter();
   initReqs();
   initPayroll();
-}
 
-async function sha256(str) {
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-async function submitPw() {
-  const val=document.getElementById('pw-input').value;
-  const hash=await sha256(val);
-  if(hash===PW_HASH){
-    document.getElementById('step-auth').style.display='none';
-    document.getElementById('step-upload').style.display='block';
-    document.getElementById('pw-error').textContent='';
-  } else {
-    document.getElementById('pw-error').textContent='Incorrect password. Please try again.';
-    document.getElementById('pw-input').value='';
-    document.getElementById('pw-input').focus();
-  }
-}
-function togglePw(){const i=document.getElementById('pw-input');i.type=i.type==='password'?'text':'password';}
-
-let modalUploadType = 'statutory';
-function openModal(type){
-  modalUploadType = type || 'statutory';
-  const isReq = modalUploadType === 'requirements';
-  const isPay = modalUploadType === 'payroll';
-  document.getElementById('modal-title').textContent = isReq ? 'Update Requirements Data' : isPay ? 'Update Payroll Data' : 'Update Statutory Data';
-  document.getElementById('modal-sub').textContent   = 'Administrator access required';
-  document.getElementById('upload-hint').textContent = isReq
-    ? 'Accepts .xlsx — same format as the Document Upload Report'
-    : isPay
-    ? 'Accepts .xlsx — same format as the Employee Report Details (must include Bank Name column)'
-    : 'Accepts .xlsx — same format as the Employee Report Details';
-  document.getElementById('modal').classList.add('open');
-  document.getElementById('step-auth').style.display='block';
-  document.getElementById('step-upload').style.display='none';
-  document.getElementById('pw-input').value='';
-  document.getElementById('pw-error').textContent='';
-  document.getElementById('upload-status').textContent='';
-  document.getElementById('upload-status').className='upload-status';
-  setTimeout(()=>document.getElementById('pw-input').focus(),200);
-}
-function closeModal(){document.getElementById('modal').classList.remove('open');}
-function handleOverlayClick(e){if(e.target===document.getElementById('modal'))closeModal();}
-
-function handleDrop(e){
-  e.preventDefault();
-  document.getElementById('upload-area').classList.remove('drag');
-  const f=e.dataTransfer.files[0];if(f)handleFileUpload(f);
-}
-function handleFileUpload(file){
-  if(!file)return;
-  const status=document.getElementById('upload-status');
-  status.className='upload-status';
-  status.textContent='Reading file… (large files may take 15–30 seconds, please wait)';
-  const reader=new FileReader();
-  if(modalUploadType==='requirements'){
-    reader.onload=function(e){ setTimeout(()=>processReqFile(e.target.result,status),50); };
-  } else if(modalUploadType==='payroll'){
-    reader.onload=function(e){ setTimeout(()=>processPayFile(e.target.result,status),50); };
-  } else {
-    reader.onload=function(e){ setTimeout(()=>processFile(e.target.result,status),50); };
-  }
-  reader.readAsArrayBuffer(file);
-}
-
-function processFile(buffer,status){
-  try{
-    status.textContent='Parsing spreadsheet…';
-    const wb=XLSX.read(buffer,{type:'array',cellDates:true,dense:true,raw:false});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-    if(json.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
-    const headers=json[0].map(h=>String(h).trim());
-    const required=['EMPLOYEECODE','EMPLOYMENT STATUS','TIN','SSS NUMBER','PAGIBIG NUMBER','PHILHEALTH NUMBER'];
-    const missing=required.filter(c=>!headers.includes(c));
-    if(missing.length){status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
-    const colIdx={};headers.forEach((h,i)=>colIdx[h]=i);
-    const statusIdx=colIdx['EMPLOYMENT STATUS'];
-    const bankIdx=colIdx['BANKNAME'];
-    const needed=Object.keys(KEY_MAP);
-    const bankRecords=[];
-    const CHUNK=5000;
-    let i=1, processed=[];
-    const seen=new Set();
-    function processChunk(){
-      const end=Math.min(i+CHUNK,json.length);
-      for(;i<end;i++){
-        const r=json[i];
-        if(!r||!Array.isArray(r)||!r.some(c=>c!==''))continue;
-        if(!['Active','Off-Roster','Off-Detailing'].includes(String(r[statusIdx]||'').trim()))continue;
-        const ecodeVal=String(r[colIdx['EMPLOYEECODE']]||'').trim();
-        if(!ecodeVal.match(/^\d+$/))continue;
-        const obj={};
-        needed.forEach(col=>{
-          if(colIdx[col]===undefined){obj[KEY_MAP[col]]='';return;}
-          let v=String(r[colIdx[col]]||'').trim();
-          if(COMP_COLS.includes(col))v=(v===''||v==='0')?'X':'Y';
-          if(col==='DATE OF JOINING'&&v){const d=new Date(v);if(!isNaN(d))v=d.toISOString().slice(0,10);}
-          obj[KEY_MAP[col]]=v;
-        });
-        const key=JSON.stringify(obj);
-        if(!seen.has(key)){
-          seen.add(key);processed.push(obj);
-          if(bankIdx!==undefined){
-            const bankRaw=String(r[bankIdx]||'').trim();
-            if(bankRaw===''||bankRaw==='0'){
-              bankRecords.push({
-                id:obj.id, name:obj.name, email:obj.email, estat:obj.estat, etype:obj.etype,
-                branch:obj.branch, entity:obj.entity, dept:obj.dept, sec:obj.sec, doj:obj.doj, bankMissing:true
-              });
-            }
-          }
-        }
-      }
-      const pct=Math.round((i/json.length)*100);
-      status.textContent='Processing… '+pct+'% — '+processed.length.toLocaleString()+' active employees found so far';
-      if(i<json.length){setTimeout(processChunk,0);}
-      else{
-        all=processed;
-        window._lastUploadedBankMap = bankRecords;
+  // Step 2: Silently fetch fresh data from Supabase in background
+  setTimeout(async ()=>{
+    try{
+      const supaData = await Promise.race([
+        supabaseLoad('statutory_data'),
+        new Promise(resolve=>setTimeout(()=>resolve(null),8000))
+      ]);
+      if(supaData && supaData.length > 0){
+        all = supaData.map(r=>({
+          id:r.employee_code, name:r.employee_name, email:r.email,
+          estat:r.employment_status, etype:r.employment_type, desig:r.designation,
+          branch:r.branch, entity:r.entity, dept:r.department, sec:r.section,
+          doj:r.date_of_joining, tin:r.tin, sss:r.sss, pag:r.pagibig, ph:r.philhealth,
+          l1:r.l1_manager, l2:r.l2_manager, l3:r.l3_manager
+        }));
+        buildFilters(); doFilter();
         document.getElementById('hdr-count').textContent=all.length.toLocaleString();
-        buildFilters();doFilter();
-        status.className='upload-status ok';
-        status.textContent='✓ Loaded '+all.length.toLocaleString()+' employees. Saving to database…';
-        setAsOfDate(new Date());
-        const statRecords = all.map(r=>({
-          employee_code:r.id, employee_name:r.name, email:r.email,
-          employment_status:r.estat, employment_type:r.etype, designation:r.desig,
-          branch:r.branch, entity:r.entity, department:r.dept, section:r.sec,
-          date_of_joining:r.doj, tin:r.tin, sss:r.sss, pagibig:r.pag, philhealth:r.ph,
-          l1_manager:r.l1, l2_manager:r.l2, l3_manager:r.l3
-        }));
-        // Also extract no-bank employees from the same file for the Payroll tab
-        const noBankRecords = (window._lastUploadedBankMap || [])
-          .filter(r => r.bankMissing)
-          .map(r => ({
-            employee_code:r.id, employee_name:r.name, email:r.email,
-            employment_status:r.estat, employment_type:r.etype,
-            branch:r.branch, entity:r.entity, department:r.dept, section:r.sec,
-            date_of_joining:r.doj
-          }));
-        Promise.all([
-          supabaseSave('statutory_data', statRecords),
-          noBankRecords.length ? supabaseSave('payroll_data', noBankRecords) : Promise.resolve(true)
-        ]).then(([statOk, payOk])=>{
-          payAll = noBankRecords.map(r=>({
-            id:r.employee_code, name:r.employee_name, email:r.email,
-            estat:r.employment_status, etype:r.employment_type,
-            branch:r.branch, entity:r.entity, dept:r.department, sec:r.section, doj:r.date_of_joining
-          }));
-          if(document.getElementById('section-payroll').innerHTML!=='') { buildPayFilters(); payDoFilter(); }
-          status.textContent = (statOk && payOk)
-            ? '✓ '+all.length.toLocaleString()+' employees saved (Statutory + Payroll tabs updated). Everyone will see updated data when they open the dashboard.'
-            : '✓ Loaded locally but could not save to database. Check your connection and try again.';
-        });
+        const sc=document.getElementById('tab-cnt-statutory');
+        if(sc) sc.textContent=all.length.toLocaleString();
+        supabaseLoadMeta('statutory_data').then(meta=>{ if(meta) setAsOfDate(meta); });
       }
-    }
-    setTimeout(processChunk,0);
-  }catch(err){
-    console.error(err);
-    status.className='upload-status err';
-    status.textContent='Could not read file. Ensure it is a valid .xlsx export.';
-  }
+    }catch(e){ console.log('Background Supabase load failed, using embedded data'); }
+  }, 500);
 }
 
-function processReqFile(buffer, status){
-  try{
-    status.textContent='Parsing requirements spreadsheet\u2026';
-    const wb=XLSX.read(buffer,{type:'array',raw:true});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    status.textContent='Converting rows\u2026';
-    const jsonObj=XLSX.utils.sheet_to_json(ws,{defval:''});
-    if(jsonObj.length<1){status.className='upload-status err';status.textContent='File appears empty.';return;}
-    status.textContent='Filtering '+jsonObj.length.toLocaleString()+' rows\u2026';
-    const VALID=new Set(['Active','Off-Roster','Off-Detailing']);
-    const PEME_S =new Set(['PEME Completion Agreement','PEME Completion Slip','Signed Pre-Employment Medical Exam (PEME) Completion Slip','Signed Pre-employment Medical Exam Completion Slip','PEME Clearance Form']);
-    const NBI_S  =new Set(['NBI Clearance','NBI Clearance (Original)']);
-    const JOB_S  =new Set(['Signed Job offer and Employment Contract']);
-    const BIRTH_S=new Set(['Birth Certificate','Photocopy Birth Certificate (3 copies)']);
-    const EDUC_S =new Set(['Proof of Education (Diploma / Certificate of Graduation / TOR)']);
-    const empInfo={},pemeSet=new Set,nbiSet=new Set,jobSet=new Set,birthSet=new Set,educSet=new Set;
-    const CHUNK=8000; let i=0;
-    function pass1Chunk(){
-      const end=Math.min(i+CHUNK,jsonObj.length);
-      for(;i<end;i++){
-        const r=jsonObj[i];
-        const estat=String(r['EMPLOYMENT STATUS']||'').trim();
-        if(!VALID.has(estat))continue;
-        const ecode=String(r['EMPLOYEECODE']||'').trim();
-        if(!ecode||!/^\d+$/.test(ecode))continue;
-        if(!empInfo[ecode]){
-          empInfo[ecode]={
-            id:ecode,name:String(r['EMPLOYEE NAME']||'').trim(),estat:estat,
-            entity:String(r['Entity']||'').trim(),
-            dept:String(r['Department']||'').trim(),
-            sec:String(r['Section']||'').trim(),
-            email:'', desig:'', doj:'',
-          };
-        }
-        const dtype=String(r['DOCUMENT TYPE']||'').trim();
-        if(PEME_S.has(dtype))  pemeSet.add(ecode);
-        if(NBI_S.has(dtype))   nbiSet.add(ecode);
-        if(JOB_S.has(dtype))   jobSet.add(ecode);
-        if(BIRTH_S.has(dtype)) birthSet.add(ecode);
-        if(EDUC_S.has(dtype))  educSet.add(ecode);
-      }
-      status.textContent='Processing\u2026 '+Math.round((i/jsonObj.length)*100)+'%';
-      if(i<jsonObj.length){setTimeout(pass1Chunk,0);}
-      else{
-        const branchLookup={}, emailLookup={}, desigLookup={}, dojLookup={};
-        all.forEach(r=>{
-          if(r.id&&r.branch) branchLookup[r.id]=r.branch;
-          if(r.id&&r.email)  emailLookup[r.id]=r.email;
-          if(r.id&&r.desig)  desigLookup[r.id]=r.desig;
-          if(r.id&&r.doj)    dojLookup[r.id]=r.doj;
-        });
-        const records=Object.values(empInfo).map(e=>({
-          ...e,branch:branchLookup[e.id]||'',email:emailLookup[e.id]||'',
-          desig:desigLookup[e.id]||'',doj:dojLookup[e.id]||'',
-          peme:pemeSet.has(e.id)?'Y':'X',nbi:nbiSet.has(e.id)?'Y':'X',
-          job:jobSet.has(e.id)?'Y':'X',birth:birthSet.has(e.id)?'Y':'X',educ:educSet.has(e.id)?'Y':'X',
-        }));
-        reqAll=records;buildReqFilters();reqDoFilter();setAsOfDate(new Date());
-        status.textContent='\u2713 Loaded '+records.length.toLocaleString()+' employees. Saving to database\u2026';
-        const reqRecords=records.map(r=>({
-          employee_code:r.id,employee_name:r.name,email:r.email,employment_status:r.estat,
-          entity:r.entity,branch:r.branch,department:r.dept,section:r.sec,
-          designation:r.desig,date_of_joining:r.doj,
-          designation:r.desig,date_of_joining:r.doj,
-          peme:r.peme,nbi:r.nbi,job_contract:r.job,birth_cert:r.birth,proof_of_educ:r.educ
-        }));
-        supabaseSave('requirements_data',reqRecords).then(ok=>{
-          status.className='upload-status ok';
-          status.textContent=ok
-            ?'\u2713 '+records.length.toLocaleString()+' employees saved. Everyone will see updated data when they open the dashboard.'
-            :'\u2713 Loaded locally but could not save to database. Check your connection and try again.';
-        });
-      }
-    }
-    setTimeout(pass1Chunk,0);
-  }catch(err){
-    console.error(err);
-    status.className='upload-status err';
-    status.textContent='Could not read file. Ensure it is a valid Document Upload Report .xlsx.';
-  }
-}
-
-function processPayFile(buffer, status){
-  try{
-    status.textContent='Parsing payroll spreadsheet\u2026';
-    const wb=XLSX.read(buffer,{type:'array',raw:true});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    status.textContent='Converting rows\u2026';
-    const jsonObj=XLSX.utils.sheet_to_json(ws,{defval:''});
-    if(jsonObj.length<1){status.className='upload-status err';status.textContent='File appears empty.';return;}
-    const headers=Object.keys(jsonObj[0]);
-    const required=['EMPLOYEECODE','EMPLOYEE NAME','EMPLOYMENT STATUS','BANKNAME'];
-    const missing=required.filter(c=>!headers.includes(c));
-    if(missing.length){status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
-    status.textContent='Filtering '+jsonObj.length.toLocaleString()+' rows\u2026';
-    const VALID=new Set(['Active','Off-Roster','Off-Detailing']);
-    const seen={};
-    const CHUNK=8000; let i=0;
-    function chunkProcess(){
-      const end=Math.min(i+CHUNK,jsonObj.length);
-      for(;i<end;i++){
-        const r=jsonObj[i];
-        const estat=String(r['EMPLOYMENT STATUS']||'').trim();
-        if(!VALID.has(estat))continue;
-        const ecode=String(r['EMPLOYEECODE']||'').trim();
-        if(!ecode||!/^\d+$/.test(ecode))continue;
-        const bankRaw=String(r['BANKNAME']||'').trim();
-        const hasNoBank = bankRaw==='' || bankRaw==='0';
-        if(!hasNoBank) continue;
-        if(!seen[ecode]){
-          seen[ecode]={
-            id:ecode, name:String(r['EMPLOYEE NAME']||'').trim(),
-            email:String(r['OFFICIAL EMAIL ADDRESS']||'').trim(),
-            estat:estat, etype:String(r['EMPLOYMENT TYPE']||'').trim(),
-            branch:String(r['Branch']||'').trim(), entity:String(r['Entity']||'').trim(),
-            dept:String(r['Department']||'').trim(), sec:String(r['Section']||'').trim()
-          };
-        }
-      }
-      status.textContent='Processing\u2026 '+Math.round((i/jsonObj.length)*100)+'%';
-      if(i<jsonObj.length){setTimeout(chunkProcess,0);}
-      else{
-        const records=Object.values(seen);
-        payAll=records;
-        if(document.getElementById('section-payroll').innerHTML!=='') { buildPayFilters(); payDoFilter(); }
-        setAsOfDate(new Date());
-        status.textContent='\u2713 Loaded '+records.length.toLocaleString()+' employees. Saving to database\u2026';
-        const payRecords=records.map(r=>({
-          employee_code:r.id, employee_name:r.name, email:r.email,
-          employment_status:r.estat, employment_type:r.etype,
-          branch:r.branch, entity:r.entity, department:r.dept, section:r.sec
-        }));
-        supabaseSave('payroll_data',payRecords).then(ok=>{
-          status.className='upload-status ok';
-          status.textContent=ok
-            ?'\u2713 '+records.length.toLocaleString()+' employees saved. Everyone will see updated data when they open the dashboard.'
-            :'\u2713 Loaded locally but could not save to database. Check your connection and try again.';
-        });
-      }
-    }
-    setTimeout(chunkProcess,0);
-  }catch(err){
-    console.error(err);
-    status.className='upload-status err';
-    status.textContent='Could not read file. Ensure it is a valid Employee Report Details .xlsx with Bank Name column.';
-  }
-}
-
-function buildFilters(){
-  const s={entity:new Set,dept:new Set,branch:new Set,etype:new Set};
-  all.forEach(r=>{
-    if(r.entity)s.entity.add(r.entity);if(r.dept)s.dept.add(r.dept);
-    if(r.branch)s.branch.add(r.branch);if(r.etype)s.etype.add(r.etype);
-  });
-  const fill=(id,set,ph)=>{
-    const el=document.getElementById(id);
-    el.innerHTML='<option value="">'+ph+'</option>';
-    [...set].sort().forEach(v=>{const o=document.createElement('option');o.value=o.text=v;el.appendChild(o);});
-  };
-  fill('f-entity',s.entity,'All entities');fill('f-dept',s.dept,'All departments');
-  fill('f-branch',s.branch,'All branches');fill('f-etype',s.etype,'All emp. types');
-}
-
-function buildHead(){
-  const tr=document.getElementById('thead-row');
-  COLS.forEach(c=>{
-    const th=document.createElement('th');
-    th.style.minWidth=c.w+'px';
-    th.innerHTML=c.label+' <span class="arr" id="arr-'+c.k+'">↕</span>';
-    th.onclick=()=>sortBy(c.k,th);
-    tr.appendChild(th);
-  });
-}
-
-function sortBy(k,thEl){
-  if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}
-  document.querySelectorAll('th').forEach(t=>t.classList.remove('sorted'));
-  document.querySelectorAll('.arr').forEach(e=>e.textContent='↕');
-  if(thEl){thEl.classList.add('sorted');const a=thEl.querySelector('.arr');if(a)a.textContent=sortDir===1?'↑':'↓';}
-  filtered.sort((a,b)=>a[k]===b[k]?0:a[k]>b[k]?sortDir:-sortDir);
-  page=1;render();
-}
-
-function doFilter(){
-  const q=(document.getElementById('q').value||'').toLowerCase();
-  const fe=document.getElementById('f-entity').value;
-  const fd=document.getElementById('f-dept').value;
-  const fb=document.getElementById('f-branch').value;
-  const ft=document.getElementById('f-etype').value;
-  const fc=document.getElementById('f-comp').value;
-  const fcs=document.getElementById('f-compstatus').value;
-  filtered=all.filter(r=>{
-    if(q&&!(r.id+' '+r.name+' '+r.desig).toLowerCase().includes(q))return false;
-    if(fe&&r.entity!==fe)return false;if(fd&&r.dept!==fd)return false;
-    if(fb&&r.branch!==fb)return false;if(ft&&r.etype!==ft)return false;
-    if(fc==='missing' &&r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')return false;
-    if(fc==='complete'&&(r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X'))return false;
-    if(fc==='tin'&&r.tin!=='X')return false;if(fc==='sss'&&r.sss!=='X')return false;
-    if(fc==='pag'&&r.pag!=='X')return false;if(fc==='ph'&&r.ph!=='X')return false;
-    if(fcs){const complete=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';if(fcs==='COMPLETE'&&!complete)return false;if(fcs==='INCOMPLETE'&&complete)return false;}
-    return true;
-  });
-  page=1;updateKPIs();render();
-}
-
-function updateKPIs(){
-  const t=filtered.length;
-  const tm=filtered.filter(r=>r.tin==='X').length;
-  const sm=filtered.filter(r=>r.sss==='X').length;
-  const pm=filtered.filter(r=>r.pag==='X').length;
-  const hm=filtered.filter(r=>r.ph==='X').length;
-  const any=filtered.filter(r=>r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X').length;
-  const ok=t-any; const rate=t?Math.round(ok/t*100):0;
-  const rc=rate>=92?'c-ok':rate>=90?'c-warn':'c-bad';
-  const wrap=document.getElementById('stat-kpi-wrap');
-  if(wrap){
-    wrap.innerHTML=`<div class="kpi-strip" style="grid-template-columns:repeat(8,1fr)">
-      <div class="kpi-item"><div class="kpi-accent-bar" style="background:#3b82f6"></div><div class="kpi-label">Headcount</div><div class="kpi-val">${t.toLocaleString()}</div><div class="kpi-sub-note">active employees</div></div>
-      <div class="kpi-item"><div class="kpi-accent-bar" style="background:#16a34a"></div><div class="kpi-label">Fully compliant</div><div class="kpi-val c-ok">${ok.toLocaleString()}</div><div class="kpi-sub-note">all 4 numbers</div></div>
-      <div class="kpi-item"><div class="kpi-accent-bar" style="background:#dc2626"></div><div class="kpi-label">Has missing</div><div class="kpi-val ${any>0?'c-bad':'c-ok'}">${any.toLocaleString()}</div><div class="kpi-sub-note">1+ number missing</div></div>
-      <div class="kpi-item"><div class="kpi-accent-bar" style="background:#7c3aed"></div><div class="kpi-label">Compliance rate</div><div class="kpi-val ${rc}">${rate}%</div><div class="kpi-sub-note">target &ge; 92%</div></div>
-      <div class="kpi-item"><div class="kpi-accent-bar" style="background:#ea580c"></div><div class="kpi-label">TIN missing</div><div class="kpi-val ${tm>0?'c-bad':'c-ok'}">${tm.toLocaleString()}</div><div class="kpi-sub-note">of ${t.toLocaleString()}</div></div>
-      <div class="kpi-item"><div class="kpi-accent-bar" style="background:#0891b2"></div><div class="kpi-label">SSS missing</div><div class="kpi-val ${sm>0?'c-bad':'c-ok'}">${sm.toLocaleString()}</div><div class="kpi-sub-note">of ${t.toLocaleString()}</div></div>
-      <div class="kpi-item"><div class="kpi-accent-bar" style="background:#d97706"></div><div class="kpi-label">Pag-IBIG missing</div><div class="kpi-val ${pm>0?'c-bad':'c-ok'}">${pm.toLocaleString()}</div><div class="kpi-sub-note">of ${t.toLocaleString()}</div></div>
-      <div class="kpi-item"><div class="kpi-accent-bar" style="background:#db2777"></div><div class="kpi-label">PhilHealth missing</div><div class="kpi-val ${hm>0?'c-bad':'c-ok'}">${hm.toLocaleString()}</div><div class="kpi-sub-note">of ${t.toLocaleString()}</div></div>
-    </div>`;
-  }
-  document.getElementById('count-pill').textContent=t.toLocaleString()+' records';
-  const sc=document.getElementById('tab-cnt-statutory');
-  if(sc) sc.textContent=all.length.toLocaleString();
-}
-
-
-function doFilter(){
-  const q=(document.getElementById('q').value||'').toLowerCase();
-  const fe=document.getElementById('f-entity').value;
-  const fd=document.getElementById('f-dept').value;
-  const fb=document.getElementById('f-branch').value;
-  const ft=document.getElementById('f-etype').value;
-  const fc=document.getElementById('f-comp').value;
-  const fcs=document.getElementById('f-compstatus').value;
-  filtered=all.filter(r=>{
-    if(q&&!(r.id+' '+r.name+' '+r.desig).toLowerCase().includes(q))return false;
-    if(fe&&r.entity!==fe)return false;if(fd&&r.dept!==fd)return false;
-    if(fb&&r.branch!==fb)return false;if(ft&&r.etype!==ft)return false;
-    if(fc==='missing' &&r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')return false;
-    if(fc==='complete'&&(r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X'))return false;
-    if(fc==='tin'&&r.tin!=='X')return false;if(fc==='sss'&&r.sss!=='X')return false;
-    if(fc==='pag'&&r.pag!=='X')return false;if(fc==='ph'&&r.ph!=='X')return false;
-    if(fcs){const complete=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';if(fcs==='COMPLETE'&&!complete)return false;if(fcs==='INCOMPLETE'&&complete)return false;}
-    return true;
-  });
-  page=1;updateKPIs();render();
-}
-
-function updateKPIs(){
-  const t=filtered.length;
-  const tm=filtered.filter(r=>r.tin==='X').length;
-  const sm=filtered.filter(r=>r.sss==='X').length;
-  const pm=filtered.filter(r=>r.pag==='X').length;
-  const hm=filtered.filter(r=>r.ph==='X').length;
-  const any=filtered.filter(r=>r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X').length;
-  const ok=t-any;const rate=t?Math.round(ok/t*100):0;
-  const set=(id,v,cls)=>{const el=document.getElementById(id);el.textContent=v;if(cls)el.className='kpi-val '+cls;};
-  set('k-total',t.toLocaleString());
-  set('k-ok',ok.toLocaleString(),'c-ok');
-  set('k-miss',any.toLocaleString(),any>0?'c-bad':'c-ok');
-  set('k-rate',rate+'%',rate>=92?'c-ok':rate>=90?'c-warn':'c-bad');
-  set('k-tin',tm.toLocaleString(),tm>0?'c-bad':'c-ok');
-  set('k-sss',sm.toLocaleString(),sm>0?'c-bad':'c-ok');
-  set('k-pag',pm.toLocaleString(),pm>0?'c-bad':'c-ok');
-  set('k-ph', hm.toLocaleString(),hm>0?'c-bad':'c-ok');
-  document.getElementById('count-pill').textContent=t.toLocaleString()+' records';
-}
-
-function render(){
-  totalPages=Math.max(1,Math.ceil(filtered.length/perPage));
-  page=Math.min(Math.max(1,page),totalPages);
-  const s=(page-1)*perPage,e=Math.min(s+perPage,filtered.length);
-  document.getElementById('tbody').innerHTML=filtered.slice(s,e).map(r=>`<tr>${COLS.map(c=>{
-    const v=r[c.k]||'';
-    if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'✓':'✗'}</span></td>`;}
-    if(c.compliance_status){const complete=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';return `<td class="comp-cell"><span class="${complete?'comp-complete':'comp-incomplete'}">${complete?'COMPLETE':'INCOMPLETE'}</span></td>`;}
-    if(c.status){
-      const cls=v==='Active'?'status-active':v==='Off-Roster'?'status-offroster':'status-offdetailing';
-      return `<td><span class="status-pill ${cls}">${esc(v)}</span></td>`;
-    }
-    return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
-  }).join('')}</tr>`).join('');
-  document.getElementById('page-info').textContent=`${(s+1).toLocaleString()}–${e.toLocaleString()} of ${filtered.length.toLocaleString()} records`;
-  const btns=document.getElementById('page-btns');btns.innerHTML='';
-  const add=(label,p,disabled,active)=>{const b=document.createElement('button');b.className='pg-btn';b.textContent=label;b.disabled=disabled;if(active)b.classList.add('active');b.onclick=()=>{page=p;render();};btns.appendChild(b);};
-  add('«',1,page<=1);add('‹',page-1,page<=1);
-  const st=Math.max(1,page-2),en=Math.min(totalPages,page+2);
-  if(st>1){add('1',1,false,false);if(st>2){const sp=document.createElement('button');sp.textContent='…';sp.disabled=true;btns.appendChild(sp);}}
-  for(let p2=st;p2<=en;p2++)add(p2,p2,false,p2===page);
-  if(en<totalPages){if(en<totalPages-1){const sp=document.createElement('button');sp.textContent='…';sp.disabled=true;btns.appendChild(sp);}add(totalPages,totalPages,false,false);}
-  add('›',page+1,page>=totalPages);add('»',totalPages,page>=totalPages);
-}
-
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-function exportXLSX(){
-  const h=COLS.map(c=>c.label);
-  const d=filtered.map(r=>COLS.map(c=>{const v=r[c.k]||'';if(c.comp)return v==='Y'?'✓':'✗';if(c.compliance_status)return(r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')?'COMPLETE':'INCOMPLETE';return v;}));
-  const ws=XLSX.utils.aoa_to_sheet([h,...d]);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Compliance');
-  XLSX.writeFile(wb,'TA_Onboarding_Compliance_'+new Date().toISOString().slice(0,10)+'.xlsx');
-}
-
-/* ── TAB SWITCHING ── */
-let currentTab = 'statutory';
-function switchTab(tab){
-  currentTab = tab;
-  document.getElementById('tab-btn-statutory').classList.toggle('active', tab==='statutory');
-  document.getElementById('tab-btn-requirements').classList.toggle('active', tab==='requirements');
-  document.getElementById('tab-btn-payroll').classList.toggle('active', tab==='payroll');
-  document.getElementById('section-statutory').style.display    = tab==='statutory'   ? '' : 'none';
-  document.getElementById('section-requirements').style.display = tab==='requirements'? '' : 'none';
-  document.getElementById('section-payroll').style.display      = tab==='payroll'     ? '' : 'none';
-  document.getElementById('section-shared').style.display       = tab==='statutory'   ? '' : 'none';
-  if(tab==='requirements') renderReqSection();
-  if(tab==='payroll') renderPayrollSection();
-}
-
-/* ── REQUIREMENTS DATA ── */
-let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='', reqSortDir=1;
-
-const REQ_COLS = [
-  {k:'id',    label:'Employee Code',              w:120, mono:true},
-  {k:'name',  label:'Employee Name',              w:240},
-  {k:'email', label:'Email Address',             w:220},
-  {k:'estat', label:'Status',                     w:100, status:true},
-  {k:'entity',label:'Entity',                     w:220},
-  {k:'branch',label:'Branch',                     w:110},
-  {k:'dept',  label:'Department',                 w:165},
-  {k:'sec',   label:'Section',                    w:130},
-  {k:'desig', label:'Designation',                w:200},
-  {k:'doj',   label:'Date of Joining',            w:120, mono:true},
-  {k:'peme',  label:'PEME Completion',            w:130, comp:true, thClass:'req-primary-1'},
-  {k:'nbi',   label:'NBI Clearance',              w:115, comp:true, thClass:'req-primary-2'},
-  {k:'job',   label:'Job Offer & Contract',       w:155, comp:true, thClass:'req-primary-3'},
-  {k:'birth', label:'Birth Certificate',          w:135, comp:true, thClass:'req-secondary-1'},
-  {k:'educ',  label:'Proof of Education',         w:145, comp:true, thClass:'req-secondary-2'},
-  {k:'req_compliance_status', label:'Compliance Status',        w:150, req_compliance_status:true},
-];
 
 async function initReqs(){
-  let supaReqs = await Promise.race([
-    supabaseLoad('requirements_data'),
-    new Promise(resolve=>setTimeout(()=>resolve(null),4000))
-  ]);
-  if(supaReqs && supaReqs.length > 0){
-    reqAll = supaReqs.map(r=>({
-      id:r.employee_code, name:r.employee_name, email:r.email||'', estat:r.employment_status,
-      entity:r.entity, branch:r.branch, dept:r.department, sec:r.section,
-      desig:r.designation||'', doj:r.date_of_joining||'',
-      desig:r.designation||'', doj:r.date_of_joining||'',
-      peme:r.peme, nbi:r.nbi, job:r.job_contract, birth:r.birth_cert, educ:r.proof_of_educ
-    }));
-  } else {
-    const json = await decompress(DOCS_B64);
-    reqAll = JSON.parse(json);
-  }
+  // Load embedded first for instant display
+  const json = await decompress(DOCS_B64);
+  reqAll = JSON.parse(json);
   document.getElementById('section-requirements').innerHTML = buildReqHTML();
   buildReqFilters();
   reqDoFilter();
-}
+  const _rc=document.getElementById('tab-cnt-requirements');
+  if(_rc) _rc.textContent=reqAll.length.toLocaleString();
 
-function buildReqHTML(){
-  return `
-  <div class="req-kpi-strip" id="req-kpi-strip">
-    <div class="kpi-item k-total"><div class="kpi-label">Total Employees</div><div class="kpi-val" id="rk-total">—</div></div>
-    <div class="kpi-item k-ok">  <div class="kpi-label">All Docs Complete</div><div class="kpi-val c-ok" id="rk-ok">—</div></div>
-    <div class="kpi-item k-miss"><div class="kpi-label">Has Missing Docs</div><div class="kpi-val c-bad" id="rk-miss">—</div></div>
-    <div class="kpi-item k-tin"> <div class="kpi-label">PEME Missing</div><div class="kpi-val" id="rk-peme">—</div></div>
-    <div class="kpi-item k-sss"> <div class="kpi-label">NBI Missing</div><div class="kpi-val" id="rk-nbi">—</div></div>
-    <div class="kpi-item k-pag"> <div class="kpi-label">Job Contract Missing</div><div class="kpi-val" id="rk-job">—</div></div>
-    <div class="kpi-item k-ph">  <div class="kpi-label">Birth Cert Missing</div><div class="kpi-val" id="rk-birth">—</div></div>
-  </div>
-  <div class="req-toolbar">
-    <div class="search-wrap">
-      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.4"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      <input type="text" id="rq" placeholder="Search name, code…" oninput="reqDoFilter()">
-    </div>
-    <div class="toolbar-divider"></div>
-    <select class="filter-sel" id="rf-entity" onchange="reqDoFilter()"><option value="">All entities</option></select>
-    <select class="filter-sel" id="rf-branch" onchange="reqDoFilter()"><option value="">All branches</option></select>
-    <select class="filter-sel" id="rf-dept"   onchange="reqDoFilter()"><option value="">All departments</option></select>
-    <select class="filter-sel" id="rf-estat"  onchange="reqDoFilter()"><option value="">All statuses</option></select>
-    <select class="filter-sel" id="rf-comp"   onchange="reqDoFilter()">
-      <option value="">All compliance</option>
-      <option value="missing">Has missing (✗)</option>
-      <option value="complete">All complete</option>
-      <option value="peme">PEME missing</option>
-      <option value="nbi">NBI missing</option>
-      <option value="job">Job Contract missing</option>
-      <option value="birth">Birth Cert missing</option>
-      <option value="educ">Proof of Educ missing</option>
-    </select>
-    <select class="filter-sel" id="rf-compstatus" onchange="reqDoFilter()">
-      <option value="">All statuses</option>
-      <option value="COMPLETE">Complete</option>
-      <option value="INCOMPLETE">Incomplete</option>
-    </select>
-    <div class="toolbar-divider"></div>
-    <div class="toolbar-right">
-      <span class="count-pill" id="req-count-pill">—</span>
-      <button class="btn-export" onclick="exportReqXLSX()">
-        <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Export
-      </button>
-    </div>
-  </div>
-  <div class="table-outer">
-    <table>
-      <thead><tr id="req-thead"></tr></thead>
-      <tbody id="req-tbody"></tbody>
-    </table>
-  </div>
-  <div class="footer">
-    <div class="page-info" id="req-page-info"></div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <div class="page-btns" id="req-page-btns"></div>
-      <select class="per-page-sel" onchange="reqPerPage=+this.value;reqPage=1;reqRender()">
-        <option value="25">25 / page</option>
-        <option value="50" selected>50 / page</option>
-        <option value="100">100 / page</option>
-      </select>
-    </div>
-  </div>`;
-}
-
-function renderReqSection(){
-  buildReqHead();
-  reqDoFilter();
-}
-
-function buildReqFilters(){
-  const se=new Set, sb=new Set, sd=new Set, ss=new Set;
-  reqAll.forEach(r=>{
-    if(r.entity) se.add(r.entity);
-    if(r.branch) sb.add(r.branch);
-    if(r.dept)   sd.add(r.dept);
-    if(r.estat)  ss.add(r.estat);
-  });
-  const fill=(id,set)=>{
-    const el=document.getElementById(id);
-    if(!el)return;
-    [...set].sort().forEach(v=>{const o=document.createElement('option');o.value=o.text=v;el.appendChild(o);});
-  };
-  fill('rf-entity',se);fill('rf-branch',sb);fill('rf-dept',sd);fill('rf-estat',ss);
-}
-
-function buildReqHead(){
-  const tr=document.getElementById('req-thead');
-  if(!tr||tr.children.length>0)return;
-  REQ_COLS.forEach(c=>{
-    const th=document.createElement('th');
-    th.style.minWidth=c.w+'px';
-    if(c.thClass) th.classList.add(c.thClass);
-    th.innerHTML=c.label+' <span class="arr" id="rarr-'+c.k+'">↕</span>';
-    th.onclick=()=>reqSortBy(c.k,th);
-    tr.appendChild(th);
-  });
-}
-
-function reqSortBy(k,thEl){
-  if(reqSortKey===k)reqSortDir*=-1;else{reqSortKey=k;reqSortDir=1;}
-  document.querySelectorAll('#req-thead th').forEach(t=>t.classList.remove('sorted'));
-  document.querySelectorAll('.arr[id^="rarr"]').forEach(e=>e.textContent='↕');
-  if(thEl){thEl.classList.add('sorted');const a=thEl.querySelector('.arr');if(a)a.textContent=reqSortDir===1?'↑':'↓';}
-  reqFiltered.sort((a,b)=>a[k]===b[k]?0:a[k]>b[k]?reqSortDir:-reqSortDir);
-  reqPage=1;reqRender();
-}
-
-function reqDoFilter(){
-  const q=(document.getElementById('rq')?.value||'').toLowerCase();
-  const fe=document.getElementById('rf-entity')?.value||'';
-  const fb=document.getElementById('rf-branch')?.value||'';
-  const fd=document.getElementById('rf-dept')?.value||'';
-  const fs=document.getElementById('rf-estat')?.value||'';
-  const fc=document.getElementById('rf-comp')?.value||'';
-  const fcs=document.getElementById('rf-compstatus')?.value||'';
-  reqFiltered=reqAll.filter(r=>{
-    if(q&&!(r.id+' '+r.name).toLowerCase().includes(q))return false;
-    if(fe&&r.entity!==fe) return false;
-    if(fb&&r.branch!==fb) return false;
-    if(fd&&r.dept!==fd)   return false;
-    if(fs&&r.estat!==fs) return false;
-    if(fc==='missing' &&r.peme==='Y'&&r.nbi==='Y'&&r.job==='Y'&&r.birth==='Y'&&r.educ==='Y')return false;
-    if(fc==='complete'&&(r.peme==='X'||r.nbi==='X'||r.job==='X'||r.birth==='X'||r.educ==='X'))return false;
-    if(fc==='peme' &&r.peme !=='X')return false;
-    if(fc==='nbi'  &&r.nbi  !=='X')return false;
-    if(fc==='job'  &&r.job  !=='X')return false;
-    if(fc==='birth'&&r.birth!=='X')return false;
-    if(fc==='educ' &&r.educ !=='X')return false;
-    if(fcs){const complete=r.peme==='Y'&&r.nbi==='Y'&&r.job==='Y'&&r.birth==='Y'&&r.educ==='Y';if(fcs==='COMPLETE'&&!complete)return false;if(fcs==='INCOMPLETE'&&complete)return false;}
-    return true;
-  });
-  reqPage=1;reqUpdateKPIs();reqRender();
-}
-
-function reqUpdateKPIs(){
-  const t=reqFiltered.length;
-  const pm=reqFiltered.filter(r=>r.peme==='X').length;
-  const nm=reqFiltered.filter(r=>r.nbi==='X').length;
-  const jm=reqFiltered.filter(r=>r.job==='X').length;
-  const bm=reqFiltered.filter(r=>r.birth==='X').length;
-  const em=reqFiltered.filter(r=>r.educ==='X').length;
-  const any=reqFiltered.filter(r=>r.peme==='X'||r.nbi==='X'||r.job==='X'||r.birth==='X'||r.educ==='X').length;
-  const ok=t-any;
-  const set=(id,v,cls)=>{const el=document.getElementById(id);if(!el)return;el.textContent=v;if(cls)el.className='kpi-val '+cls;};
-  set('rk-total',t.toLocaleString());
-  set('rk-ok',ok.toLocaleString(),'c-ok');
-  set('rk-miss',any.toLocaleString(),any>0?'c-bad':'c-ok');
-  set('rk-peme',pm.toLocaleString(),pm>0?'c-bad':'c-ok');
-  set('rk-nbi', nm.toLocaleString(),nm>0?'c-bad':'c-ok');
-  set('rk-job', jm.toLocaleString(),jm>0?'c-bad':'c-ok');
-  set('rk-birth',bm.toLocaleString(),bm>0?'c-bad':'c-ok');
-  document.getElementById('req-count-pill').textContent=t.toLocaleString()+' records';
-}
-
-function reqRender(){
-  const totalP=Math.max(1,Math.ceil(reqFiltered.length/reqPerPage));
-  reqPage=Math.min(Math.max(1,reqPage),totalP);
-  const s=(reqPage-1)*reqPerPage,e=Math.min(s+reqPerPage,reqFiltered.length);
-  document.getElementById('req-tbody').innerHTML=reqFiltered.slice(s,e).map(r=>`<tr>${REQ_COLS.map(c=>{
-    const v=r[c.k]||'';
-    if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'✓':'✗'}</span></td>`;}
-    if(c.req_compliance_status){const complete=r.peme==='Y'&&r.nbi==='Y'&&r.job==='Y'&&r.birth==='Y'&&r.educ==='Y';return `<td class="comp-cell"><span class="${complete?'comp-complete':'comp-incomplete'}">${complete?'COMPLETE':'INCOMPLETE'}</span></td>`;}
-    if(c.status){const sc=v==='Active'?'status-active':v==='Off-Roster'?'status-offroster':'status-offdetailing';return `<td><span class="status-pill ${sc}"><i class="ti ti-circle-filled" style="font-size:7px"></i>${esc(v)}</span></td>`;}
-    return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
-  }).join('')}</tr>`).join('');
-  document.getElementById('req-page-info').textContent=`${(s+1).toLocaleString()}–${e.toLocaleString()} of ${reqFiltered.length.toLocaleString()} records`;
-  const btns=document.getElementById('req-page-btns');btns.innerHTML='';
-  const add=(label,p,disabled,active)=>{const b=document.createElement('button');b.className='pg-btn';b.textContent=label;b.disabled=disabled;if(active)b.classList.add('active');b.onclick=()=>{reqPage=p;reqRender();};btns.appendChild(b);};
-  add('«',1,reqPage<=1);add('‹',reqPage-1,reqPage<=1);
-  const st=Math.max(1,reqPage-2),en=Math.min(totalP,reqPage+2);
-  if(st>1){add('1',1,false,false);if(st>2){const sp=document.createElement('button');sp.textContent='…';sp.disabled=true;btns.appendChild(sp);}}
-  for(let p2=st;p2<=en;p2++)add(p2,p2,false,p2===reqPage);
-  if(en<totalP){if(en<totalP-1){const sp=document.createElement('button');sp.textContent='…';sp.disabled=true;btns.appendChild(sp);}add(totalP,totalP,false,false);}
-  add('›',reqPage+1,reqPage>=totalP);add('»',totalP,reqPage>=totalP);
-}
-
-function exportReqXLSX(){
-  const h=REQ_COLS.map(c=>c.label);
-  const d=reqFiltered.map(r=>REQ_COLS.map(c=>{const v=r[c.k]||'';if(c.comp)return v==='Y'?'✓':'✗';if(c.req_compliance_status)return(r.peme==='Y'&&r.nbi==='Y'&&r.job==='Y'&&r.birth==='Y'&&r.educ==='Y')?'COMPLETE':'INCOMPLETE';return v;}));
-  const ws=XLSX.utils.aoa_to_sheet([h,...d]);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Requirements');
-  XLSX.writeFile(wb,'TA_Requirements_'+new Date().toISOString().slice(0,10)+'.xlsx');
-}
-
-/* ── SUPABASE PERSISTENCE ── */
-const SUPA_HEADERS = {
-  'apikey': SUPA_KEY,
-  'Authorization': 'Bearer '+SUPA_KEY,
-  'Content-Type': 'application/json',
-  'Prefer': 'resolution=merge-duplicates'
-};
-
-async function supabaseSave(table, records){
-  try{
-    // Delete existing data first
-    await fetch(`${SUPA_URL}/rest/v1/${table}?id=gte.0`, {
-      method:'DELETE', headers:{...SUPA_HEADERS, 'Prefer':''}
-    });
-    // Delete by matching all (no id filter needed - use a dummy filter)
-    await fetch(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`, {
-      method:'DELETE', headers:{...SUPA_HEADERS, 'Prefer':''}
-    });
-
-    // Insert in batches of 500
-    const BATCH = 500;
-    for(let i=0;i<records.length;i+=BATCH){
-      const batch = records.slice(i,i+BATCH);
-      const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
-        method:'POST',
-        headers: SUPA_HEADERS,
-        body: JSON.stringify(batch)
-      });
-      if(!res.ok){
-        const err = await res.text();
-        console.error('Supabase insert error:', err);
-        return false;
+  // Then silently refresh from Supabase
+  setTimeout(async()=>{
+    try{
+      const supaReqs = await Promise.race([
+        supabaseLoad('requirements_data'),
+        new Promise(resolve=>setTimeout(()=>resolve(null),8000))
+      ]);
+      if(supaReqs && supaReqs.length > 0){
+        reqAll = supaReqs.map(r=>({
+          id:r.employee_code, name:r.employee_name, email:r.email||'', estat:r.employment_status,
+          entity:r.entity, branch:r.branch, dept:r.department, sec:r.section,
+          desig:r.designation||'', doj:r.date_of_joining||'',
+          peme:r.peme, nbi:r.nbi, job:r.job_contract, birth:r.birth_cert, educ:r.proof_of_educ
+        }));
+        if(currentTab==='requirements'){ buildReqFilters(); reqDoFilter(); }
+        const _rc=document.getElementById('tab-cnt-requirements');
+        if(_rc) _rc.textContent=reqAll.length.toLocaleString();
       }
-    }
-    // Save last updated timestamp
-    await fetch(`${SUPA_URL}/rest/v1/dashboard_meta?key=eq.last_updated_${table}`, {
-      method:'DELETE', headers:{...SUPA_HEADERS, 'Prefer':''}
-    });
-    await fetch(`${SUPA_URL}/rest/v1/dashboard_meta`, {
-      method:'POST',
-      headers: SUPA_HEADERS,
-      body: JSON.stringify([{key:`last_updated_${table}`, value: new Date().toISOString()}])
-    });
-    return true;
-  } catch(e){
-    console.error('Supabase save error:',e);
-    return false;
-  }
+    }catch(e){}
+  }, 1000);
 }
 
-async function supabaseLoad(table){
-  try{
-    const controller = new AbortController();
-    const timeout = setTimeout(()=>controller.abort(), 5000); // 5s timeout
-    let records=[], offset=0;
-    const LIMIT=1000;
-    while(true){
-      const res = await fetch(
-        `${SUPA_URL}/rest/v1/${table}?select=*&limit=${LIMIT}&offset=${offset}`,
-        {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}, signal:controller.signal}
-      );
-      if(!res.ok){clearTimeout(timeout);return null;}
-      const batch = await res.json();
-      records = records.concat(batch);
-      if(batch.length < LIMIT){clearTimeout(timeout);break;}
-      offset += LIMIT;
-    }
-    return records.length > 0 ? records : null;
-  } catch(e){
-    console.error('Supabase load error:',e.name==='AbortError'?'Timeout — falling back to embedded data':e);
-    return null;
-  }
-}
-
-async function supabaseLoadMeta(table){
-  try{
-    const res = await fetch(
-      `${SUPA_URL}/rest/v1/dashboard_meta?key=eq.last_updated_${table}&select=value`,
-      {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}
-    );
-    if(!res.ok) return null;
-    const data = await res.json();
-    return data.length > 0 ? new Date(data[0].value) : null;
-  } catch(e){ return null; }
-}
-
-
-/* ── PAYROLL DATA ── */
-let payAll=[], payFiltered=[], payPage=1, payPerPage=50, paySortKey='', paySortDir=1;
-
-const PAY_COLS = [
-  {k:'id',    label:'Employee Code',     w:120, mono:true},
-  {k:'name',  label:'Employee Name',     w:240},
-  {k:'email', label:'Email Address',     w:220},
-  {k:'estat', label:'Status',            w:100, status:true},
-  {k:'etype', label:'Emp. Type',         w:110},
-  {k:'branch',label:'Branch',            w:100},
-  {k:'entity',label:'Entity',            w:220},
-  {k:'dept',  label:'Department',        w:160},
-  {k:'sec',   label:'Section',           w:130},
-  {k:'doj',   label:'Date of Joining',    w:120, mono:true},
-  {k:'payroll_status', label:'Payroll Account', w:180, payroll_status:true},
-];
 
 async function initPayroll(){
-  let supaPay = await Promise.race([
-    supabaseLoad('payroll_data'),
-    new Promise(resolve=>setTimeout(()=>resolve(null),4000))
-  ]);
-  if(supaPay && supaPay.length > 0){
-    payAll = supaPay.map(r=>({
-      id:r.employee_code, name:r.employee_name, email:r.email,
-      estat:r.employment_status, etype:r.employment_type,
-      branch:r.branch, entity:r.entity, dept:r.department, sec:r.section, doj:r.date_of_joining
-    }));
-  } else {
-    const json = await decompress(PAYROLL_B64);
-    payAll = JSON.parse(json);
-  }
+  // Load embedded first
+  const json = await decompress(PAYROLL_B64);
+  payAll = JSON.parse(json);
+  const _pc=document.getElementById('tab-cnt-payroll');
+  if(_pc) _pc.textContent=payAll.length.toLocaleString();
+
+  // Then silently refresh from Supabase
+  setTimeout(async()=>{
+    try{
+      const supaPay = await Promise.race([
+        supabaseLoad('payroll_data'),
+        new Promise(resolve=>setTimeout(()=>resolve(null),8000))
+      ]);
+      if(supaPay && supaPay.length > 0){
+        payAll = supaPay.map(r=>({
+          id:r.employee_code, name:r.employee_name, email:r.email,
+          estat:r.employment_status, etype:r.employment_type,
+          branch:r.branch, entity:r.entity, dept:r.department, sec:r.section,
+          doj:r.date_of_joining
+        }));
+        if(currentTab==='payroll'){ buildPayFilters(); payDoFilter(); }
+        const _pc=document.getElementById('tab-cnt-payroll');
+        if(_pc) _pc.textContent=payAll.length.toLocaleString();
+      }
+    }catch(e){}
+  }, 1500);
 }
+
 
 function renderPayrollSection(){
   if(document.getElementById('section-payroll').innerHTML==='') {
