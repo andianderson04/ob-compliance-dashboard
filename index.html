@@ -685,14 +685,14 @@ function handleFileUpload(file){
   }else{
     reader.onload=e=>setTimeout(()=>processFile(e.target.result,status),50);
   }
-  reader.readAsArrayBuffer(file);
+  reader.readAsBinaryString(file);
 }
 
 function processFile(buffer,status){
   try{
     status.textContent='Parsing spreadsheet…';
     status.textContent='Parsing file (20-30 seconds for large files)\u2026';
-    const wb=XLSX.read(new Uint8Array(buffer),{type:'array',raw:false,cellDates:false});
+    const wb=XLSX.read(buffer,{type:'binary',raw:false,cellDates:false});
     if(!wb||!wb.SheetNames||!wb.SheetNames.length){status.className='upload-status err';status.textContent='Could not open workbook. Ensure the file is a valid .xlsx file.';return;}
     const ws=wb.Sheets[wb.SheetNames[0]];
     if(!ws){status.className='upload-status err';status.textContent='Workbook has no sheets.';return;}
@@ -782,7 +782,7 @@ function processReqFile(buffer,status){
   try{
     status.textContent='Parsing requirements spreadsheet…';
     status.textContent='Parsing requirements file (may take up to 30 seconds)\u2026';
-    const wb=XLSX.read(new Uint8Array(buffer),{type:'array',raw:false,cellDates:false});
+    const wb=XLSX.read(buffer,{type:'binary',raw:false,cellDates:false});
     if(!wb||!wb.SheetNames||!wb.SheetNames.length){status.className='upload-status err';status.textContent='Could not open workbook.';return;}
     const ws=wb.Sheets[wb.SheetNames[0]];
     if(!ws){status.className='upload-status err';status.textContent='Workbook has no sheets.';return;}
