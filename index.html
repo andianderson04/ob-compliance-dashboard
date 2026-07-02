@@ -581,7 +581,7 @@ async function initReqs(){
           peme:r.peme,nbi:r.nbi,job:r.job_contract,birth:r.birth_cert,educ:r.proof_of_educ
         })));
         document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
-        if(currentTab==='requirements'){buildReqFilters();reqDoFilter();}
+        buildReqFilters();reqDoFilter();
       }
     }catch(e){}
   },1000);
@@ -603,7 +603,7 @@ async function initPayroll(){
           branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining
         })));
         document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
-        if(currentTab==='payroll'){buildPayFilters();payDoFilter();}
+        buildPayFilters();payDoFilter();
       }
     }catch(e){}
   },1500);
@@ -762,7 +762,7 @@ function processFile(buffer,status){
           branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining
         }));
         document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
-        if(currentTab==='payroll'){buildPayFilters();payDoFilter();}
+        buildPayFilters();payDoFilter();
         status.className='upload-status ok';
         status.textContent=(statOk&&payOk)
           ?'\u2713 '+all.length.toLocaleString()+' employees saved. Statutory + Payroll tabs updated.'
