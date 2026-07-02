@@ -812,8 +812,8 @@ function processReqFile(buffer,status){
         if(JOB_S.has(dtype))jobSet.add(ecode);if(BIRTH_S.has(dtype))birthSet.add(ecode);
         if(EDUC_S.has(dtype))educSet.add(ecode);
       }
-      status.textContent='Processing… '+Math.round((i/jsonObj.length)*100)+'%';
-      if(i<jsonObj.length){setTimeout(chunkProcess,0);return;}
+      status.textContent='Processing… '+Math.round((i/rawRows.length)*100)+'%';
+      if(i<rawRows.length){setTimeout(chunkProcess,0);return;}
       const branchLkp={},emailLkp={},desigLkp={},dojLkp={};
       all.forEach(r=>{
         if(r.id&&r.branch)branchLkp[r.id]=r.branch;
