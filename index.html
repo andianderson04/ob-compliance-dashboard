@@ -490,16 +490,17 @@ const SUPA_HEADERS={
 };
 async function supabaseLoad(table){
   try{
-    const ctrl=new AbortController();
-    const t=setTimeout(()=>ctrl.abort(),6000);
     let records=[],offset=0;
     while(true){
+      const ctrl=new AbortController();
+      const t=setTimeout(()=>ctrl.abort(),8000);
       const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*&limit=1000&offset=${offset}`,
         {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY},signal:ctrl.signal});
-      if(!res.ok){clearTimeout(t);return null;}
+      clearTimeout(t);
+      if(!res.ok){return null;}
       const batch=await res.json();
       records=records.concat(batch);
-      if(batch.length<1000){clearTimeout(t);break;}
+      if(batch.length<1000)break;
       offset+=1000;
     }
     return records.length>0?records:null;
@@ -558,7 +559,7 @@ async function init(){
         if(meta)setAsOfDate(meta); else setAsOfDate(new Date());
       }
     }catch(e){}
-  },500);
+  },0);
   // Restore asof from session
   const saved=sessionStorage.getItem('asof');
   if(saved)setAsOfDate(new Date(saved));
@@ -584,7 +585,7 @@ async function initReqs(){
         buildReqFilters();reqDoFilter();
       }
     }catch(e){}
-  },1000);
+  },0);
 }
 
 async function initPayroll(){
@@ -606,7 +607,7 @@ async function initPayroll(){
         buildPayFilters();payDoFilter();
       }
     }catch(e){}
-  },1500);
+  },0);
 }
 
 /* ── TAB SWITCHING ── */
