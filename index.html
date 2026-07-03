@@ -37,6 +37,12 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .header-sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;letter-spacing:.02em}
 .header-asof{font-size:10px;color:rgba(255,255,255,.4);margin-top:4px;font-style:italic;display:none}
 .header-asof strong{color:rgba(255,255,255,.65);font-style:normal}
+.sync-warning{display:none;align-items:center;justify-content:space-between;gap:14px;background:#FEF3E2;border-bottom:1px solid #F0C674;color:#7A5A12;padding:9px 20px;font-size:12.5px}
+.sync-warning .sw-text{display:flex;align-items:center;gap:8px}
+.sync-warning .sw-icon{font-size:14px}
+.sync-warning button{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;border:1px solid #D8A93B;background:#FFFFFF;color:#7A5A12;cursor:pointer}
+.sync-warning button:hover{background:#FCEFD6}
+.sync-warning button:disabled{opacity:.6;cursor:default}
 .header-right{display:flex;align-items:center;gap:12px;padding:16px 0;
   border-left:1px solid rgba(255,255,255,.1);padding-left:24px}
 .hdr-badge{background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);
@@ -260,6 +266,11 @@ tbody tr:hover td{background:#eef4fc}
         Update Requirements
       </button>
     </div>
+  </div>
+
+  <div class="sync-warning" id="sync-warning">
+    <span class="sw-text"><span class="sw-icon">&#9888;&#65039;</span><span id="sync-warning-text"></span></span>
+    <button id="sync-retry-btn" onclick="retrySyncAll()">Retry now</button>
   </div>
 
   <!-- TABS -->
@@ -527,6 +538,89 @@ async function supabaseMeta(table){
   }catch(e){return null;}
 }
 
+/* ── LIVE SYNC (shared across all three tables) ── */
+const syncState={statutory:null,requirements:null,payroll:null}; // null=not yet attempted, true=ok, false=failed
+const SYNC_LABELS={statutory:'Statutory Numbers',requirements:'Requirements',payroll:'RCBC Payroll'};
+
+function updateSyncBanner(){
+  const banner=document.getElementById('sync-warning');
+  if(!banner)return;
+  const failed=Object.entries(syncState).filter(([,v])=>v===false).map(([k])=>SYNC_LABELS[k]);
+  if(!failed.length){banner.style.display='none';return;}
+  document.getElementById('sync-warning-text').textContent=
+    `Couldn't reach the live database for: ${failed.join(', ')}. You're viewing a cached snapshot, which may be out of date.`;
+  banner.style.display='flex';
+}
+
+async function syncTable(key,table,applyFn,{withMeta=false}={}){
+  try{
+    const data=await supabaseLoad(table);
+    if(data&&data.length>0){
+      applyFn(data);
+      syncState[key]=true;
+      if(withMeta){
+        // Isolated on purpose: a hiccup fetching/formatting the "as of" timestamp
+        // must never flip a successful data sync back to "failed".
+        try{
+          const meta=await supabaseMeta(table);
+          if(meta)setAsOfDate(meta); else setAsOfDate(new Date());
+        }catch(metaErr){ /* non-fatal — data itself loaded fine */ }
+      }
+    }else{
+      syncState[key]=false;
+    }
+  }catch(e){
+    syncState[key]=false;
+  }
+  updateSyncBanner();
+  return syncState[key];
+}
+
+function applyStatutoryData(data){
+  all=data.map(r=>(({
+    id:r.employee_code,name:r.employee_name,email:r.email,
+    estat:r.employment_status,etype:r.employment_type,desig:r.designation,
+    branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,
+    doj:r.date_of_joining,tin:r.tin,sss:r.sss,pag:r.pagibig,ph:r.philhealth,
+    l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
+  })));
+  buildFilters();doFilter();
+  document.getElementById('hdr-count').textContent=all.length.toLocaleString();
+  document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
+}
+
+function applyRequirementsData(data){
+  reqAll=data.map(r=>(({
+    id:r.employee_code,name:r.employee_name,email:r.email||'',estat:r.employment_status,
+    entity:r.entity,branch:r.branch,dept:r.department,sec:r.section,
+    desig:r.designation||'',doj:r.date_of_joining||'',
+    peme:r.peme,nbi:r.nbi,job:r.job_contract,birth:r.birth_cert,educ:r.proof_of_educ
+  })));
+  document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
+  buildReqFilters();reqDoFilter();
+}
+
+function applyPayrollData(data){
+  payAll=data.map(r=>(({
+    id:r.employee_code,name:r.employee_name,email:r.email,
+    estat:r.employment_status,etype:r.employment_type,
+    branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining
+  })));
+  document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
+  buildPayFilters();payDoFilter();
+}
+
+async function retrySyncAll(){
+  const btn=document.getElementById('sync-retry-btn');
+  if(btn){btn.disabled=true;btn.textContent='Retrying…';}
+  await Promise.all([
+    syncTable('statutory','statutory_data',applyStatutoryData,{withMeta:true}),
+    syncTable('requirements','requirements_data',applyRequirementsData),
+    syncTable('payroll','payroll_data',applyPayrollData)
+  ]);
+  if(btn){btn.disabled=false;btn.textContent='Retry now';}
+}
+
 /* ── INIT ── */
 async function init(){
   // 1. Load embedded immediately
@@ -538,28 +632,9 @@ async function init(){
   document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
   buildFilters(); buildHead(); doFilter();
   initReqs(); initPayroll();
-  // 2. Background: check Supabase for fresher data
-  setTimeout(async()=>{
-    try{
-      const [supaData,meta]=await Promise.all([
-        Promise.race([supabaseLoad('statutory_data'),new Promise(r=>setTimeout(()=>r(null),8000))]),
-        supabaseMeta('statutory_data')
-      ]);
-      if(supaData&&supaData.length>0){
-        all=supaData.map(r=>(({
-          id:r.employee_code,name:r.employee_name,email:r.email,
-          estat:r.employment_status,etype:r.employment_type,desig:r.designation,
-          branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,
-          doj:r.date_of_joining,tin:r.tin,sss:r.sss,pag:r.pagibig,ph:r.philhealth,
-          l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
-        })));
-        buildFilters(); doFilter();
-        document.getElementById('hdr-count').textContent=all.length.toLocaleString();
-        document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
-        if(meta)setAsOfDate(meta); else setAsOfDate(new Date());
-      }
-    }catch(e){}
-  },0);
+  // 2. Background: check Supabase for fresher data (no artificial delay, no total-time cap —
+  // supabaseLoad already budgets its own per-page timeout, so large tables can finish safely)
+  syncTable('statutory','statutory_data',applyStatutoryData,{withMeta:true});
   // Restore asof from session
   const saved=sessionStorage.getItem('asof');
   if(saved)setAsOfDate(new Date(saved));
@@ -571,21 +646,7 @@ async function initReqs(){
   document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
   document.getElementById('section-requirements').innerHTML=buildReqHTML();
   buildReqFilters(); reqDoFilter();
-  setTimeout(async()=>{
-    try{
-      const supaReqs=await Promise.race([supabaseLoad('requirements_data'),new Promise(r=>setTimeout(()=>r(null),8000))]);
-      if(supaReqs&&supaReqs.length>0){
-        reqAll=supaReqs.map(r=>(({
-          id:r.employee_code,name:r.employee_name,email:r.email||'',estat:r.employment_status,
-          entity:r.entity,branch:r.branch,dept:r.department,sec:r.section,
-          desig:r.designation||'',doj:r.date_of_joining||'',
-          peme:r.peme,nbi:r.nbi,job:r.job_contract,birth:r.birth_cert,educ:r.proof_of_educ
-        })));
-        document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
-        buildReqFilters();reqDoFilter();
-      }
-    }catch(e){}
-  },0);
+  syncTable('requirements','requirements_data',applyRequirementsData);
 }
 
 async function initPayroll(){
@@ -594,20 +655,8 @@ async function initPayroll(){
   document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
   document.getElementById('section-payroll').innerHTML=buildPayHTML();
   buildPayFilters(); payDoFilter();
-  setTimeout(async()=>{
-    try{
-      const supaPay=await Promise.race([supabaseLoad('payroll_data'),new Promise(r=>setTimeout(()=>r(null),8000))]);
-      if(supaPay&&supaPay.length>0){
-        payAll=supaPay.map(r=>(({
-          id:r.employee_code,name:r.employee_name,email:r.email,
-          estat:r.employment_status,etype:r.employment_type,
-          branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining
-        })));
-        document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
-        buildPayFilters();payDoFilter();
-      }
-    }catch(e){}
-  },0);
+  syncTable('payroll','payroll_data',applyPayrollData);
+
 }
 
 /* ── TAB SWITCHING ── */
@@ -1225,50 +1274,4 @@ function payDoFilter(){
 
 function payUpdateKPIs(){
   const t=payFiltered.length;
-  const el=document.getElementById('pk-total');if(el)el.textContent=t.toLocaleString();
-  const cp=document.getElementById('pay-count-pill');if(cp)cp.textContent=t.toLocaleString()+' records';
-  const pc=document.getElementById('tab-cnt-payroll');if(pc)pc.textContent=payAll.length.toLocaleString();
-}
-
-function payRender(){
-  buildPayHead();
-  const totalP=Math.max(1,Math.ceil(payFiltered.length/payPerPage));
-  payPage=Math.min(Math.max(1,payPage),totalP);
-  const s=(payPage-1)*payPerPage,e=Math.min(s+payPerPage,payFiltered.length);
-  document.getElementById('pay-tbody').innerHTML=payFiltered.slice(s,e).map(r=>`<tr>${PAY_COLS.map(c=>{
-    const v=r[c.k]||'';
-    if(c.ps)return `<td class="comp-cell"><span class="payroll-pending">Pending Payroll Account</span></td>`;
-    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':'s-offdetailing';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
-    return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
-  }).join('')}</tr>`).join('');
-  const pi=document.getElementById('pay-page-info');
-  if(pi)pi.textContent=`${(s+1).toLocaleString()}–${e.toLocaleString()} of ${payFiltered.length.toLocaleString()} records`;
-  buildPagination('pay-page-btns',payPage,totalP,p=>{payPage=p;payRender();});
-}
-
-function exportPayXLSX(){
-  const h=PAY_COLS.map(c=>c.label);
-  const d=payFiltered.map(r=>PAY_COLS.map(c=>{
-    if(c.ps)return 'Pending Payroll Account';return r[c.k]||'';
-  }));
-  const ws=XLSX.utils.aoa_to_sheet([h,...d]);const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'RCBC Payroll');
-  XLSX.writeFile(wb,'RCBC_Payroll_'+new Date().toISOString().slice(0,10)+'.xlsx');
-}
-
-/* ── AUTO-RELOAD ── */
-const CURRENT_VERSION='20260701121327';
-async function checkForUpdate(){
-  try{
-    const res=await fetch(window.location.href.split('?')[0]+'?_='+Date.now(),{cache:'no-store'});
-    const html=await res.text();
-    const match=html.match(/<meta name="dashboard-version" content="(\d+)">/);
-    if(match&&match[1]!==CURRENT_VERSION)window.location.reload(true);
-  }catch(e){}
-}
-setInterval(checkForUpdate,60000);
-
-init();
-</script>
-</body>
-</html>
+  const el=document.getElementById('pk-total');if(el)el.textContent=t.toLocaleStri
