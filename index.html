@@ -1381,7 +1381,8 @@ function processFile(buffer,status){
           seen.add(key);processed.push(obj);
           if(bankIdx!==undefined){
             const bankRaw=String(row[bankIdx]||'').trim();
-            if(bankRaw===''||bankRaw==='0')bankRecords.push({
+            const etypeNorm=(obj.etype||'').trim().toUpperCase();
+            if((bankRaw===''||bankRaw==='0')&&etypeNorm!=='SEASONAL')bankRecords.push({
               id:obj.id,name:obj.name,email:obj.email,estat:obj.estat,etype:obj.etype,
               branch:obj.branch,entity:obj.entity,dept:obj.dept,sec:obj.sec,doj:obj.doj,bankMissing:true
             });
