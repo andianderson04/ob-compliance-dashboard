@@ -126,6 +126,24 @@ td{padding:9px 12px;border-bottom:1px solid var(--rule-light);border-right:1px s
 td:last-child{border-right:none}
 td.mono{font-family:var(--mono);font-size:11px;color:var(--ink);letter-spacing:.02em}
 tbody tr:hover td{background:#F7F4EC}
+.table-outer td:first-child{position:sticky;left:0;z-index:1;background:var(--surface);box-shadow:2px 0 4px rgba(16,27,45,.06)}
+.table-outer th:first-child{position:sticky;left:0;z-index:2;background:var(--canvas);box-shadow:2px 0 4px rgba(16,27,45,.06)}
+.table-outer tbody tr:hover td:first-child{background:#F7F4EC}
+
+/* CLICKABLE KPI CARDS */
+.kpi-item.clickable{cursor:pointer;transition:border-color .15s,transform .08s,background .15s}
+.kpi-item.clickable:hover{border-color:var(--blue)}
+.kpi-item.clickable:active{transform:scale(.98)}
+.kpi-item.kpi-active{background:var(--blue-light);border-color:var(--blue)}
+.kpi-item.kpi-active::before{opacity:1;background:var(--blue)}
+th:first-child,td:first-child{position:sticky;left:0;z-index:2}
+th:first-child{z-index:11;background:var(--canvas)}
+td:first-child{background:var(--surface)}
+tbody tr:hover td:first-child{background:#F7F4EC}
+.kpi-item.kpi-click{cursor:pointer;transition:background .12s,box-shadow .12s}
+.kpi-item.kpi-click:hover{background:var(--canvas)}
+.kpi-item.kpi-click.sel{background:var(--blue-light)}
+.kpi-item.kpi-click.sel::before{background:var(--blue);opacity:1}
 
 /* PILLS */
 .status-pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
@@ -1216,6 +1234,7 @@ async function init(){
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
   document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
   buildFilters(); buildHead(); doFilter();
+  animateKpiStrip('stat-kpi-wrap');
   initReqs(); initPayroll();
   // 2. Background: check Supabase for fresher data (no artificial delay, no total-time cap —
   // supabaseLoad already budgets its own per-page timeout, so large tables can finish safely)
@@ -1231,6 +1250,7 @@ async function initReqs(){
   document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
   document.getElementById('section-requirements').innerHTML=buildReqHTML();
   buildReqFilters(); reqDoFilter();
+  animateKpiStrip('req-kpi-strip');
   syncTable('requirements','requirements_data',applyRequirementsData);
 }
 
@@ -1240,6 +1260,7 @@ async function initPayroll(){
   document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
   document.getElementById('section-payroll').innerHTML=buildPayHTML();
   buildPayFilters(); payDoFilter();
+  animateKpiStrip('pay-kpi-strip');
   syncTable('payroll','payroll_data',applyPayrollData);
 
 }
@@ -1552,16 +1573,18 @@ function updateKPIs(){
   const any=filtered.filter(r=>r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X').length;
   const ok=t-any;const rate=t?Math.round(ok/t*100):0;
   const rc=rate>=92?'c-ok':rate>=90?'c-warn':'c-bad';
+  const curComp=document.getElementById('f-comp')?.value||'';
+  const act=v=>curComp===v?' kpi-active':'';
   document.getElementById('stat-kpi-wrap').innerHTML=`
     <div class="kpi-strip" style="grid-template-columns:repeat(8,1fr)">
-      <div class="kpi-item" style="--a:#3b82f6"><div class="kpi-label">Active Headcount</div><div class="kpi-val">${t.toLocaleString()}</div><div class="kpi-sub">employees</div></div>
-      <div class="kpi-item"><div class="kpi-label">Fully Compliant</div><div class="kpi-val c-ok">${ok.toLocaleString()}</div><div class="kpi-sub">all 4 numbers</div></div>
-      <div class="kpi-item"><div class="kpi-label">Has Missing</div><div class="kpi-val ${any>0?'c-bad':'c-ok'}">${any.toLocaleString()}</div><div class="kpi-sub">1+ missing</div></div>
+      <div class="kpi-item clickable${act('')}" onclick="kpiFilterClick('f-comp','',doFilter)" style="--a:#3b82f6"><div class="kpi-label">Active Headcount</div><div class="kpi-val">${t.toLocaleString()}</div><div class="kpi-sub">employees</div></div>
+      <div class="kpi-item clickable${act('complete')}" onclick="kpiFilterClick('f-comp','complete',doFilter)"><div class="kpi-label">Fully Compliant</div><div class="kpi-val c-ok">${ok.toLocaleString()}</div><div class="kpi-sub">all 4 numbers</div></div>
+      <div class="kpi-item clickable${act('missing')}" onclick="kpiFilterClick('f-comp','missing',doFilter)"><div class="kpi-label">Has Missing</div><div class="kpi-val ${any>0?'c-bad':'c-ok'}">${any.toLocaleString()}</div><div class="kpi-sub">1+ missing</div></div>
       <div class="kpi-item"><div class="kpi-label">Compliance Rate</div><div class="kpi-val ${rc}">${rate}%</div><div class="kpi-sub">target &ge; 92%</div></div>
-      <div class="kpi-item"><div class="kpi-label">TIN Missing</div><div class="kpi-val ${tm>0?'c-bad':'c-ok'}">${tm.toLocaleString()}</div></div>
-      <div class="kpi-item"><div class="kpi-label">SSS Missing</div><div class="kpi-val ${sm>0?'c-bad':'c-ok'}">${sm.toLocaleString()}</div></div>
-      <div class="kpi-item"><div class="kpi-label">Pag-IBIG Missing</div><div class="kpi-val ${pm>0?'c-bad':'c-ok'}">${pm.toLocaleString()}</div></div>
-      <div class="kpi-item"><div class="kpi-label">PhilHealth Missing</div><div class="kpi-val ${hm>0?'c-bad':'c-ok'}">${hm.toLocaleString()}</div></div>
+      <div class="kpi-item clickable${act('tin')}" onclick="kpiFilterClick('f-comp','tin',doFilter)"><div class="kpi-label">TIN Missing</div><div class="kpi-val ${tm>0?'c-bad':'c-ok'}">${tm.toLocaleString()}</div></div>
+      <div class="kpi-item clickable${act('sss')}" onclick="kpiFilterClick('f-comp','sss',doFilter)"><div class="kpi-label">SSS Missing</div><div class="kpi-val ${sm>0?'c-bad':'c-ok'}">${sm.toLocaleString()}</div></div>
+      <div class="kpi-item clickable${act('pag')}" onclick="kpiFilterClick('f-comp','pag',doFilter)"><div class="kpi-label">Pag-IBIG Missing</div><div class="kpi-val ${pm>0?'c-bad':'c-ok'}">${pm.toLocaleString()}</div></div>
+      <div class="kpi-item clickable${act('ph')}" onclick="kpiFilterClick('f-comp','ph',doFilter)"><div class="kpi-label">PhilHealth Missing</div><div class="kpi-val ${hm>0?'c-bad':'c-ok'}">${hm.toLocaleString()}</div></div>
     </div>`;
   document.getElementById('count-pill').textContent=t.toLocaleString()+' records';
 }
@@ -1597,6 +1620,35 @@ function buildPagination(id,pg,total,cb){
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+function animateNum(el,duration){
+  if(!el)return;
+  duration=duration||700;
+  const raw=el.textContent.trim();
+  const isPct=raw.endsWith('%');
+  const target=parseInt(raw.replace(/[^0-9-]/g,''),10);
+  if(isNaN(target))return;
+  const t0=performance.now();
+  function step(t){
+    const p=Math.min(1,(t-t0)/duration);
+    const eased=1-Math.pow(1-p,3);
+    el.textContent=Math.round(target*eased).toLocaleString()+(isPct?'%':'');
+    if(p<1)requestAnimationFrame(step);
+    else el.textContent=target.toLocaleString()+(isPct?'%':'');
+  }
+  requestAnimationFrame(step);
+}
+function animateKpiStrip(containerId){
+  const c=document.getElementById(containerId);
+  if(!c)return;
+  c.querySelectorAll('.kpi-val').forEach(el=>animateNum(el));
+}
+function kpiFilterClick(selectId,value,filterFn){
+  const sel=document.getElementById(selectId);
+  if(!sel)return;
+  sel.value=(sel.value===value)?'':value;
+  filterFn();
+}
+
 function exportXLSX(){
   const h=COLS.map(c=>c.label);
   const d=filtered.map(r=>COLS.map(c=>{
@@ -1614,13 +1666,13 @@ function exportXLSX(){
 function buildReqHTML(){
   return `
   <div class="kpi-strip" id="req-kpi-strip" style="grid-template-columns:repeat(7,1fr)">
-    <div class="kpi-item"><div class="kpi-label">Total Employees</div><div class="kpi-val" id="rk-total">&mdash;</div></div>
-    <div class="kpi-item"><div class="kpi-label">All Docs Complete</div><div class="kpi-val c-ok" id="rk-ok">&mdash;</div></div>
-    <div class="kpi-item"><div class="kpi-label">Has Missing Docs</div><div class="kpi-val c-bad" id="rk-miss">&mdash;</div></div>
-    <div class="kpi-item"><div class="kpi-label">PEME Missing</div><div class="kpi-val" id="rk-peme">&mdash;</div></div>
-    <div class="kpi-item"><div class="kpi-label">NBI Missing</div><div class="kpi-val" id="rk-nbi">&mdash;</div></div>
-    <div class="kpi-item"><div class="kpi-label">Job Contract Missing</div><div class="kpi-val" id="rk-job">&mdash;</div></div>
-    <div class="kpi-item"><div class="kpi-label">Birth Cert Missing</div><div class="kpi-val" id="rk-birth">&mdash;</div></div>
+    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','',reqDoFilter)" id="rk-card-all"><div class="kpi-label">Total Employees</div><div class="kpi-val" id="rk-total">&mdash;</div></div>
+    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','complete',reqDoFilter)" id="rk-card-complete"><div class="kpi-label">All Docs Complete</div><div class="kpi-val c-ok" id="rk-ok">&mdash;</div></div>
+    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','missing',reqDoFilter)" id="rk-card-missing"><div class="kpi-label">Has Missing Docs</div><div class="kpi-val c-bad" id="rk-miss">&mdash;</div></div>
+    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','peme',reqDoFilter)" id="rk-card-peme"><div class="kpi-label">PEME Missing</div><div class="kpi-val" id="rk-peme">&mdash;</div></div>
+    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','nbi',reqDoFilter)" id="rk-card-nbi"><div class="kpi-label">NBI Missing</div><div class="kpi-val" id="rk-nbi">&mdash;</div></div>
+    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','job',reqDoFilter)" id="rk-card-job"><div class="kpi-label">Job Contract Missing</div><div class="kpi-val" id="rk-job">&mdash;</div></div>
+    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','birth',reqDoFilter)" id="rk-card-birth"><div class="kpi-label">Birth Cert Missing</div><div class="kpi-val" id="rk-birth">&mdash;</div></div>
   </div>
   <div class="toolbar">
     <div class="search-wrap">
@@ -1742,6 +1794,11 @@ function reqUpdateKPIs(){
   set('rk-job',jm.toLocaleString(),jm>0?'c-bad':'c-ok');
   set('rk-birth',bm.toLocaleString(),bm>0?'c-bad':'c-ok');
   const cp=document.getElementById('req-count-pill');if(cp)cp.textContent=t.toLocaleString()+' records';
+  const curComp=document.getElementById('rf-comp')?.value||'';
+  const cardMap={'':'rk-card-all','complete':'rk-card-complete','missing':'rk-card-missing','peme':'rk-card-peme','nbi':'rk-card-nbi','job':'rk-card-job','birth':'rk-card-birth'};
+  Object.values(cardMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('kpi-active');});
+  const activeCard=document.getElementById(cardMap[curComp]);
+  if(activeCard)activeCard.classList.add('kpi-active');
 }
 
 function reqRender(){
@@ -1777,7 +1834,7 @@ function exportReqXLSX(){
 /* ── PAYROLL ── */
 function buildPayHTML(){
   return `
-  <div class="kpi-strip" style="grid-template-columns:1fr">
+  <div class="kpi-strip" id="pay-kpi-strip" style="grid-template-columns:1fr">
     <div class="kpi-item"><div class="kpi-label">Employees Missing Payroll Bank</div><div class="kpi-val c-bad" id="pk-total">&mdash;</div><div class="kpi-sub">pending RCBC enrollment</div></div>
   </div>
   <div class="toolbar">
