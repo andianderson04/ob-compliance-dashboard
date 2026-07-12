@@ -276,6 +276,11 @@ tbody tr:hover td:first-child{background:#F7F4EC}
       <span class="hdr-badge" id="hdr-count">&mdash;</span>
       <span style="font-size:11px;color:rgba(255,255,255,.4)">employees</span>
       <div class="vdiv"></div>
+      <button class="btn-hdr" onclick="exportConsolidated()" title="One file: every active/off-roster/off-detailing employee with both statutory and requirements status">
+        <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Consolidated Report
+      </button>
+      <div class="vdiv"></div>
       <button class="btn-hdr" onclick="openModal('statutory')">
         <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 9V1M4 4l3-3 3 3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Update Statutory
@@ -1661,6 +1666,43 @@ function exportXLSX(){
   const ws=XLSX.utils.aoa_to_sheet([h,...d]);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Statutory');
   XLSX.writeFile(wb,'TA_Statutory_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+/* One row per employee (Active/Off-Roster/Off-Detailing), combining Statutory
+   Numbers detail with Requirements detail for the same person. Anchored on the
+   full statutory list `all` (not the current on-screen filter) since this is
+   meant as a complete stakeholder report, not a filtered view export. */
+function exportConsolidated(){
+  const tick=v=>v==='Y'?'\u2713':'\u2717';
+  const reqById={};
+  reqAll.forEach(r=>{reqById[r.id]=r;});
+
+  const header=[
+    'Employee Code','Employee Name','Email Address','Status','Emp. Type','Designation',
+    'Branch','Entity','Department','Section','Date of Joining',
+    'TIN','SSS','Pag-IBIG','PhilHealth','Statutory Compliance',
+    'PEME Completion','NBI Clearance','Job Offer & Contract','Birth Certificate','Proof of Education','Requirements Compliance',
+    'L1 Manager','L2 Dept. Manager','L3 Division Head'
+  ];
+
+  const rows=all.map(r=>{
+    const req=reqById[r.id];
+    const hasReq=!!req;
+    const statComp=(r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')?'COMPLETE':'INCOMPLETE';
+    const reqComp=hasReq?((req.peme==='Y'&&req.nbi==='Y'&&req.job==='Y'&&req.birth==='Y'&&req.educ==='Y')?'COMPLETE':'INCOMPLETE'):'NO RECORD';
+    return [
+      r.id,r.name,r.email,r.estat,r.etype,r.desig,
+      r.branch,r.entity,r.dept,r.sec,r.doj,
+      tick(r.tin),tick(r.sss),tick(r.pag),tick(r.ph),statComp,
+      hasReq?tick(req.peme):'N/A',hasReq?tick(req.nbi):'N/A',hasReq?tick(req.job):'N/A',hasReq?tick(req.birth):'N/A',hasReq?tick(req.educ):'N/A',reqComp,
+      r.l1,r.l2,r.l3
+    ];
+  });
+
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Consolidated');
+  XLSX.writeFile(wb,'TA_Consolidated_Compliance_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 /* ── REQUIREMENTS ── */
