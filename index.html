@@ -1680,21 +1680,24 @@ function exportConsolidated(){
   const header=[
     'Employee Code','Employee Name','Email Address','Status','Emp. Type','Designation',
     'Branch','Entity','Department','Section','Date of Joining',
-    'TIN','SSS','Pag-IBIG','PhilHealth','Statutory Compliance',
-    'PEME Completion','NBI Clearance','Job Offer & Contract','Birth Certificate','Proof of Education','Requirements Compliance',
+    'TIN','SSS','Pag-IBIG','PhilHealth',
+    'PEME Completion','NBI Clearance','Job Offer & Contract','Birth Certificate','Proof of Education',
+    'Compliance Status',
     'L1 Manager','L2 Dept. Manager','L3 Division Head'
   ];
 
   const rows=all.map(r=>{
     const req=reqById[r.id];
     const hasReq=!!req;
-    const statComp=(r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')?'COMPLETE':'INCOMPLETE';
-    const reqComp=hasReq?((req.peme==='Y'&&req.nbi==='Y'&&req.job==='Y'&&req.birth==='Y'&&req.educ==='Y')?'COMPLETE':'INCOMPLETE'):'NO RECORD';
+    const statOk=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';
+    const reqOk=hasReq&&req.peme==='Y'&&req.nbi==='Y'&&req.job==='Y'&&req.birth==='Y'&&req.educ==='Y';
+    const complianceStatus=(statOk&&reqOk)?'COMPLETE':'INCOMPLETE';
     return [
       r.id,r.name,r.email,r.estat,r.etype,r.desig,
       r.branch,r.entity,r.dept,r.sec,r.doj,
-      tick(r.tin),tick(r.sss),tick(r.pag),tick(r.ph),statComp,
-      hasReq?tick(req.peme):'N/A',hasReq?tick(req.nbi):'N/A',hasReq?tick(req.job):'N/A',hasReq?tick(req.birth):'N/A',hasReq?tick(req.educ):'N/A',reqComp,
+      tick(r.tin),tick(r.sss),tick(r.pag),tick(r.ph),
+      hasReq?tick(req.peme):'N/A',hasReq?tick(req.nbi):'N/A',hasReq?tick(req.job):'N/A',hasReq?tick(req.birth):'N/A',hasReq?tick(req.educ):'N/A',
+      complianceStatus,
       r.l1,r.l2,r.l3
     ];
   });
