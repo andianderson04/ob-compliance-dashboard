@@ -341,9 +341,12 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <div class="chart-legend" id="statDonutLegend"></div>
       </div>
       <div class="chart-panel">
-        <div class="chart-panel-head"><span class="chart-panel-label">Missing by type</span></div>
-        <div class="chart-canvas-wrap">
-          <canvas id="statBars" role="img" aria-label="Bar chart of missing TIN, SSS, Pag-IBIG, and PhilHealth counts"></canvas>
+        <div class="chart-panel-head"><span class="chart-panel-label">Compliance rate by item</span></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:4px">
+          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','tin',doFilter)" id="statTile-tin"><div class="kpi-label">TIN</div><div class="kpi-val" id="statTileVal-tin">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','sss',doFilter)" id="statTile-sss"><div class="kpi-label">SSS</div><div class="kpi-val" id="statTileVal-sss">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','pag',doFilter)" id="statTile-pag"><div class="kpi-label">Pag-IBIG</div><div class="kpi-val" id="statTileVal-pag">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','ph',doFilter)" id="statTile-ph"><div class="kpi-label">PhilHealth</div><div class="kpi-val" id="statTileVal-ph">&mdash;</div></div>
         </div>
       </div>
     </div>
@@ -1643,25 +1646,23 @@ function updateKPIs(){
     statDonutChart.update();
   }
 
-  const barKeys=['tin','sss','pag','ph'];
-  const barSel=barKeys.includes(curComp);
-  const barColors=barKeys.map(k=>(!barSel||k===curComp)?'#9C3B33':'#9C3B3355');
+  const tinRate=t?((t-tm)/t*100):0;
+  const sssRate=t?((t-sm)/t*100):0;
+  const pagRate=t?((t-pm)/t*100):0;
+  const phRate=t?((t-hm)/t*100):0;
 
-  if(!statBarChart){
-    statBarChart=new Chart(document.getElementById('statBars'),{
-      type:'bar',
-      data:{labels:['TIN','SSS','Pag-IBIG','PhilHealth'],datasets:[{data:[tm,sm,pm,hm],backgroundColor:barColors,borderRadius:4,maxBarThickness:26}]},
-      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toLocaleString()+' missing'}}},
-        scales:{x:{ticks:{color:'#5F6A7B',precision:0},grid:{color:'#EEF0F4'}},y:{ticks:{color:'#4A5568'},grid:{display:false}}},
-        onClick:(e,els)=>{if(!els.length)return;kpiFilterClick('f-comp',barKeys[els[0].index],doFilter);}
-      }
-    });
-  }else{
-    statBarChart.data.datasets[0].data=[tm,sm,pm,hm];
-    statBarChart.data.datasets[0].backgroundColor=barColors;
-    statBarChart.update();
-  }
+  const setTile=(key,rate)=>{
+    const val=document.getElementById('statTileVal-'+key);
+    const tile=document.getElementById('statTile-'+key);
+    if(!val||!tile)return;
+    val.textContent=rate.toFixed(1)+'%';
+    val.className='kpi-val '+(rate>=95?'c-ok':rate>=85?'c-warn':'c-bad');
+    tile.classList.toggle('kpi-active',curComp===key);
+  };
+  setTile('tin',tinRate);
+  setTile('sss',sssRate);
+  setTile('pag',pagRate);
+  setTile('ph',phRate);
 
   document.getElementById('count-pill').textContent=t.toLocaleString()+' records';
 }
