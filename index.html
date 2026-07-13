@@ -136,6 +136,11 @@ tbody tr:hover td{background:#F7F4EC}
 .kpi-item.clickable:active{transform:scale(.98)}
 .kpi-item.kpi-active{background:var(--blue-light);border-color:var(--blue)}
 .kpi-item.kpi-active::before{opacity:1;background:var(--blue)}
+.tile-sub{font-size:11px;color:var(--ink-3);margin-top:2px}
+.tile-bar-track{height:5px;background:var(--rule-light);border-radius:3px;margin-top:8px;overflow:hidden}
+.tile-bar-fill{height:100%;border-radius:3px;transition:width .3s ease}
+.tile-top{font-size:10.5px;color:var(--ink-3);margin-top:9px;padding-top:9px;border-top:1px solid var(--rule-light)}
+.tile-top strong{color:var(--ink-2);font-weight:600}
 
 /* CHART PANELS (replace card grids on Statutory + Requirements) */
 .chart-strip{display:grid;grid-template-columns:1fr 1.3fr;gap:0;border-bottom:1px solid var(--rule);background:var(--surface)}
@@ -343,10 +348,10 @@ tbody tr:hover td:first-child{background:#F7F4EC}
       <div class="chart-panel">
         <div class="chart-panel-head"><span class="chart-panel-label">Compliance rate by item</span></div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:4px">
-          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','tin',doFilter)" id="statTile-tin"><div class="kpi-label">TIN</div><div class="kpi-val" id="statTileVal-tin">&mdash;</div></div>
-          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','sss',doFilter)" id="statTile-sss"><div class="kpi-label">SSS</div><div class="kpi-val" id="statTileVal-sss">&mdash;</div></div>
-          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','pag',doFilter)" id="statTile-pag"><div class="kpi-label">Pag-IBIG</div><div class="kpi-val" id="statTileVal-pag">&mdash;</div></div>
-          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','ph',doFilter)" id="statTile-ph"><div class="kpi-label">PhilHealth</div><div class="kpi-val" id="statTileVal-ph">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','tin',doFilter)" id="statTile-tin"><div class="kpi-label">TIN</div><div class="kpi-val" id="statTileVal-tin">&mdash;</div><div class="tile-sub" id="statTileSub-tin">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-tin" style="width:0%"></div></div><div class="tile-top" id="statTileTop-tin">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','sss',doFilter)" id="statTile-sss"><div class="kpi-label">SSS</div><div class="kpi-val" id="statTileVal-sss">&mdash;</div><div class="tile-sub" id="statTileSub-sss">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-sss" style="width:0%"></div></div><div class="tile-top" id="statTileTop-sss">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','pag',doFilter)" id="statTile-pag"><div class="kpi-label">Pag-IBIG</div><div class="kpi-val" id="statTileVal-pag">&mdash;</div><div class="tile-sub" id="statTileSub-pag">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-pag" style="width:0%"></div></div><div class="tile-top" id="statTileTop-pag">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','ph',doFilter)" id="statTile-ph"><div class="kpi-label">PhilHealth</div><div class="kpi-val" id="statTileVal-ph">&mdash;</div><div class="tile-sub" id="statTileSub-ph">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-ph" style="width:0%"></div></div><div class="tile-top" id="statTileTop-ph">&mdash;</div></div>
         </div>
       </div>
     </div>
@@ -1651,18 +1656,37 @@ function updateKPIs(){
   const pagRate=t?((t-pm)/t*100):0;
   const phRate=t?((t-hm)/t*100):0;
 
-  const setTile=(key,rate)=>{
+  const topBranchFor=(key)=>{
+    const counts={};
+    filtered.forEach(r=>{if(r[key]==='X'){const b=r.branch||'(No branch)';counts[b]=(counts[b]||0)+1;}});
+    let top=null,topCount=0;
+    for(const b in counts){if(counts[b]>topCount){top=b;topCount=counts[b];}}
+    return top?{branch:top,count:topCount}:null;
+  };
+
+  const setTile=(key,rate,missCount)=>{
     const val=document.getElementById('statTileVal-'+key);
     const tile=document.getElementById('statTile-'+key);
+    const sub=document.getElementById('statTileSub-'+key);
+    const bar=document.getElementById('statTileBar-'+key);
+    const top=document.getElementById('statTileTop-'+key);
     if(!val||!tile)return;
+    const colorClass=rate>=95?'c-ok':rate>=85?'c-warn':'c-bad';
+    const barColor=rate>=95?'#2E6B4C':rate>=85?'#9C7A3C':'#9C3B33';
     val.textContent=rate.toFixed(1)+'%';
-    val.className='kpi-val '+(rate>=95?'c-ok':rate>=85?'c-warn':'c-bad');
+    val.className='kpi-val '+colorClass;
     tile.classList.toggle('kpi-active',curComp===key);
+    if(sub)sub.textContent=missCount.toLocaleString()+' missing';
+    if(bar){bar.style.width=rate.toFixed(1)+'%';bar.style.background=barColor;}
+    if(top){
+      const t2=topBranchFor(key);
+      top.innerHTML=t2?('Most missing in: <strong>'+esc(t2.branch)+'</strong> ('+t2.count.toLocaleString()+')'):'No gaps to flag';
+    }
   };
-  setTile('tin',tinRate);
-  setTile('sss',sssRate);
-  setTile('pag',pagRate);
-  setTile('ph',phRate);
+  setTile('tin',tinRate,tm);
+  setTile('sss',sssRate,sm);
+  setTile('pag',pagRate,pm);
+  setTile('ph',phRate,hm);
 
   document.getElementById('count-pill').textContent=t.toLocaleString()+' records';
 }
