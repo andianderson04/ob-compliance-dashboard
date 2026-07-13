@@ -136,6 +136,22 @@ tbody tr:hover td{background:#F7F4EC}
 .kpi-item.clickable:active{transform:scale(.98)}
 .kpi-item.kpi-active{background:var(--blue-light);border-color:var(--blue)}
 .kpi-item.kpi-active::before{opacity:1;background:var(--blue)}
+
+/* CHART PANELS (replace card grids on Statutory + Requirements) */
+.chart-strip{display:grid;grid-template-columns:1fr 1.3fr;gap:0;border-bottom:1px solid var(--rule);background:var(--surface)}
+.chart-panel{padding:18px 20px;border-right:1px solid var(--rule)}
+.chart-panel:last-child{border-right:none}
+.chart-panel-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+.chart-panel-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.chart-panel-total{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.chart-canvas-wrap{position:relative;height:180px}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;transition:background .15s}
+.donut-center:hover{background:rgba(0,0,0,.03)}
+.donut-center-val{font-family:var(--display);font-size:28px;font-weight:600;color:var(--ink)}
+.donut-center-sub{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.chart-legend{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--ink-2)}
+.chart-legend span{display:flex;align-items:center;gap:5px}
+.chart-legend i{display:inline-block;width:9px;height:9px;border-radius:2px}
 th:first-child,td:first-child{position:sticky;left:0;z-index:2}
 th:first-child{z-index:11;background:var(--canvas)}
 td:first-child{background:var(--surface)}
@@ -311,7 +327,27 @@ tbody tr:hover td:first-child{background:#F7F4EC}
   </div>
 
   <!-- STATUTORY KPI (injected by JS) -->
-  <div id="stat-kpi-wrap"></div>
+  <div id="stat-kpi-wrap">
+    <div class="chart-strip">
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Compliance split</span><span class="chart-panel-total" id="statChartTotal">&mdash;</span></div>
+        <div class="chart-canvas-wrap">
+          <canvas id="statDonut" role="img" aria-label="Donut chart of fully compliant versus has missing employees"></canvas>
+          <div class="donut-center" id="statDonutCenter" onclick="kpiFilterClick('f-comp','',doFilter)" title="Click to view all employees">
+            <div class="donut-center-val" id="statDonutRate">&mdash;</div>
+            <div class="donut-center-sub">compliant</div>
+          </div>
+        </div>
+        <div class="chart-legend" id="statDonutLegend"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Missing by type</span></div>
+        <div class="chart-canvas-wrap">
+          <canvas id="statBars" role="img" aria-label="Bar chart of missing TIN, SSS, Pag-IBIG, and PhilHealth counts"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- REQUIREMENTS SECTION -->
   <div id="section-requirements" style="display:none"></div>
@@ -420,6 +456,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 
 const EMBEDDED_B64 = [
@@ -1088,6 +1125,7 @@ let all=[], filtered=[], page=1, perPage=50, sortKey='', sortDir=1;
 let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='', reqSortDir=1;
 let payAll=[], payFiltered=[], payPage=1, payPerPage=50, paySortKey='', paySortDir=1;
 let currentTab='statutory', modalUploadType='statutory';
+let statDonutChart=null, statBarChart=null, reqDonutChart=null, reqBarChart=null;
 
 /* ── DECOMPRESS ── */
 async function decompress(b64){
@@ -1239,7 +1277,7 @@ async function init(){
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
   document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
   buildFilters(); buildHead(); doFilter();
-  animateKpiStrip('stat-kpi-wrap');
+  animateNum(document.getElementById('statDonutRate'));
   initReqs(); initPayroll();
   // 2. Background: check Supabase for fresher data (no artificial delay, no total-time cap —
   // supabaseLoad already budgets its own per-page timeout, so large tables can finish safely)
@@ -1255,7 +1293,7 @@ async function initReqs(){
   document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
   document.getElementById('section-requirements').innerHTML=buildReqHTML();
   buildReqFilters(); reqDoFilter();
-  animateKpiStrip('req-kpi-strip');
+  animateNum(document.getElementById('reqDonutRate'));
   syncTable('requirements','requirements_data',applyRequirementsData);
 }
 
@@ -1578,20 +1616,53 @@ function updateKPIs(){
   const hm=filtered.filter(r=>r.ph==='X').length;
   const any=filtered.filter(r=>r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X').length;
   const ok=t-any;const rate=t?Math.round(ok/t*100):0;
-  const rc=rate>=92?'c-ok':rate>=90?'c-warn':'c-bad';
   const curComp=document.getElementById('f-comp')?.value||'';
-  const act=v=>curComp===v?' kpi-active':'';
-  document.getElementById('stat-kpi-wrap').innerHTML=`
-    <div class="kpi-strip" style="grid-template-columns:repeat(8,1fr)">
-      <div class="kpi-item clickable${act('')}" onclick="kpiFilterClick('f-comp','',doFilter)" style="--a:#3b82f6"><div class="kpi-label">Active Headcount</div><div class="kpi-val">${t.toLocaleString()}</div><div class="kpi-sub">employees</div></div>
-      <div class="kpi-item clickable${act('complete')}" onclick="kpiFilterClick('f-comp','complete',doFilter)"><div class="kpi-label">Fully Compliant</div><div class="kpi-val c-ok">${ok.toLocaleString()}</div><div class="kpi-sub">all 4 numbers</div></div>
-      <div class="kpi-item clickable${act('missing')}" onclick="kpiFilterClick('f-comp','missing',doFilter)"><div class="kpi-label">Has Missing</div><div class="kpi-val ${any>0?'c-bad':'c-ok'}">${any.toLocaleString()}</div><div class="kpi-sub">1+ missing</div></div>
-      <div class="kpi-item"><div class="kpi-label">Compliance Rate</div><div class="kpi-val ${rc}">${rate}%</div><div class="kpi-sub">target &ge; 92%</div></div>
-      <div class="kpi-item clickable${act('tin')}" onclick="kpiFilterClick('f-comp','tin',doFilter)"><div class="kpi-label">TIN Missing</div><div class="kpi-val ${tm>0?'c-bad':'c-ok'}">${tm.toLocaleString()}</div></div>
-      <div class="kpi-item clickable${act('sss')}" onclick="kpiFilterClick('f-comp','sss',doFilter)"><div class="kpi-label">SSS Missing</div><div class="kpi-val ${sm>0?'c-bad':'c-ok'}">${sm.toLocaleString()}</div></div>
-      <div class="kpi-item clickable${act('pag')}" onclick="kpiFilterClick('f-comp','pag',doFilter)"><div class="kpi-label">Pag-IBIG Missing</div><div class="kpi-val ${pm>0?'c-bad':'c-ok'}">${pm.toLocaleString()}</div></div>
-      <div class="kpi-item clickable${act('ph')}" onclick="kpiFilterClick('f-comp','ph',doFilter)"><div class="kpi-label">PhilHealth Missing</div><div class="kpi-val ${hm>0?'c-bad':'c-ok'}">${hm.toLocaleString()}</div></div>
-    </div>`;
+
+  document.getElementById('statChartTotal').textContent=t.toLocaleString()+' employees';
+  document.getElementById('statDonutRate').textContent=rate+'%';
+  document.getElementById('statDonutLegend').innerHTML=
+    '<span><i style="background:#2E6B4C"></i>Compliant '+ok.toLocaleString()+'</span>'+
+    '<span><i style="background:#9C3B33"></i>Missing '+any.toLocaleString()+'</span>';
+
+  const donutKeys=['complete','missing'];
+  const donutSel=donutKeys.includes(curComp);
+  const donutColors=['#2E6B4C','#9C3B33'].map((c,i)=>(!donutSel||donutKeys[i]===curComp)?c:c+'55');
+
+  if(!statDonutChart){
+    statDonutChart=new Chart(document.getElementById('statDonut'),{
+      type:'doughnut',
+      data:{labels:['Fully compliant','Has missing'],datasets:[{data:[ok,any],backgroundColor:donutColors,borderColor:'#fff',borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'70%',
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.raw.toLocaleString()}}},
+        onClick:(e,els)=>{if(!els.length)return;kpiFilterClick('f-comp',donutKeys[els[0].index],doFilter);}
+      }
+    });
+  }else{
+    statDonutChart.data.datasets[0].data=[ok,any];
+    statDonutChart.data.datasets[0].backgroundColor=donutColors;
+    statDonutChart.update();
+  }
+
+  const barKeys=['tin','sss','pag','ph'];
+  const barSel=barKeys.includes(curComp);
+  const barColors=barKeys.map(k=>(!barSel||k===curComp)?'#9C3B33':'#9C3B3355');
+
+  if(!statBarChart){
+    statBarChart=new Chart(document.getElementById('statBars'),{
+      type:'bar',
+      data:{labels:['TIN','SSS','Pag-IBIG','PhilHealth'],datasets:[{data:[tm,sm,pm,hm],backgroundColor:barColors,borderRadius:4,maxBarThickness:26}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toLocaleString()+' missing'}}},
+        scales:{x:{ticks:{color:'#5F6A7B',precision:0},grid:{color:'#EEF0F4'}},y:{ticks:{color:'#4A5568'},grid:{display:false}}},
+        onClick:(e,els)=>{if(!els.length)return;kpiFilterClick('f-comp',barKeys[els[0].index],doFilter);}
+      }
+    });
+  }else{
+    statBarChart.data.datasets[0].data=[tm,sm,pm,hm];
+    statBarChart.data.datasets[0].backgroundColor=barColors;
+    statBarChart.update();
+  }
+
   document.getElementById('count-pill').textContent=t.toLocaleString()+' records';
 }
 
@@ -1711,14 +1782,26 @@ function exportConsolidated(){
 /* ── REQUIREMENTS ── */
 function buildReqHTML(){
   return `
-  <div class="kpi-strip" id="req-kpi-strip" style="grid-template-columns:repeat(7,1fr)">
-    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','',reqDoFilter)" id="rk-card-all"><div class="kpi-label">Total Employees</div><div class="kpi-val" id="rk-total">&mdash;</div></div>
-    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','complete',reqDoFilter)" id="rk-card-complete"><div class="kpi-label">All Docs Complete</div><div class="kpi-val c-ok" id="rk-ok">&mdash;</div></div>
-    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','missing',reqDoFilter)" id="rk-card-missing"><div class="kpi-label">Has Missing Docs</div><div class="kpi-val c-bad" id="rk-miss">&mdash;</div></div>
-    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','peme',reqDoFilter)" id="rk-card-peme"><div class="kpi-label">PEME Missing</div><div class="kpi-val" id="rk-peme">&mdash;</div></div>
-    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','nbi',reqDoFilter)" id="rk-card-nbi"><div class="kpi-label">NBI Missing</div><div class="kpi-val" id="rk-nbi">&mdash;</div></div>
-    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','job',reqDoFilter)" id="rk-card-job"><div class="kpi-label">Job Contract Missing</div><div class="kpi-val" id="rk-job">&mdash;</div></div>
-    <div class="kpi-item clickable" onclick="kpiFilterClick('rf-comp','birth',reqDoFilter)" id="rk-card-birth"><div class="kpi-label">Birth Cert Missing</div><div class="kpi-val" id="rk-birth">&mdash;</div></div>
+  <div id="req-kpi-strip">
+    <div class="chart-strip">
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Compliance split</span><span class="chart-panel-total" id="reqChartTotal">&mdash;</span></div>
+        <div class="chart-canvas-wrap">
+          <canvas id="reqDonut" role="img" aria-label="Donut chart of employees with all documents complete versus has missing documents"></canvas>
+          <div class="donut-center" id="reqDonutCenter" onclick="kpiFilterClick('rf-comp','',reqDoFilter)" title="Click to view all employees">
+            <div class="donut-center-val" id="reqDonutRate">&mdash;</div>
+            <div class="donut-center-sub">complete</div>
+          </div>
+        </div>
+        <div class="chart-legend" id="reqDonutLegend"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Missing by document type</span></div>
+        <div class="chart-canvas-wrap">
+          <canvas id="reqBars" role="img" aria-label="Bar chart of missing PEME, NBI, job contract, birth certificate, and proof of education counts"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="toolbar">
     <div class="search-wrap">
@@ -1830,21 +1913,63 @@ function reqUpdateKPIs(){
   const nm=reqFiltered.filter(r=>r.nbi==='X').length;
   const jm=reqFiltered.filter(r=>r.job==='X').length;
   const bm=reqFiltered.filter(r=>r.birth==='X').length;
+  const em=reqFiltered.filter(r=>r.educ==='X').length;
   const any=reqFiltered.filter(r=>r.peme==='X'||r.nbi==='X'||r.job==='X'||r.birth==='X'||r.educ==='X').length;
   const ok=t-any;
-  const set=(id,v,cls)=>{const el=document.getElementById(id);if(!el)return;el.textContent=v;if(cls)el.className='kpi-val '+cls;};
-  set('rk-total',t.toLocaleString());set('rk-ok',ok.toLocaleString(),'c-ok');
-  set('rk-miss',any.toLocaleString(),any>0?'c-bad':'c-ok');
-  set('rk-peme',pm.toLocaleString(),pm>0?'c-bad':'c-ok');
-  set('rk-nbi',nm.toLocaleString(),nm>0?'c-bad':'c-ok');
-  set('rk-job',jm.toLocaleString(),jm>0?'c-bad':'c-ok');
-  set('rk-birth',bm.toLocaleString(),bm>0?'c-bad':'c-ok');
-  const cp=document.getElementById('req-count-pill');if(cp)cp.textContent=t.toLocaleString()+' records';
+  const rate=t?Math.round(ok/t*100):0;
   const curComp=document.getElementById('rf-comp')?.value||'';
-  const cardMap={'':'rk-card-all','complete':'rk-card-complete','missing':'rk-card-missing','peme':'rk-card-peme','nbi':'rk-card-nbi','job':'rk-card-job','birth':'rk-card-birth'};
-  Object.values(cardMap).forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('kpi-active');});
-  const activeCard=document.getElementById(cardMap[curComp]);
-  if(activeCard)activeCard.classList.add('kpi-active');
+
+  const totalEl=document.getElementById('reqChartTotal');if(totalEl)totalEl.textContent=t.toLocaleString()+' employees';
+  const rateEl=document.getElementById('reqDonutRate');if(rateEl)rateEl.textContent=rate+'%';
+  const legendEl=document.getElementById('reqDonutLegend');
+  if(legendEl)legendEl.innerHTML=
+    '<span><i style="background:#2E6B4C"></i>Complete '+ok.toLocaleString()+'</span>'+
+    '<span><i style="background:#9C3B33"></i>Missing '+any.toLocaleString()+'</span>';
+
+  const donutKeys=['complete','missing'];
+  const donutSel=donutKeys.includes(curComp);
+  const donutColors=['#2E6B4C','#9C3B33'].map((c,i)=>(!donutSel||donutKeys[i]===curComp)?c:c+'55');
+
+  if(document.getElementById('reqDonut')){
+    if(!reqDonutChart){
+      reqDonutChart=new Chart(document.getElementById('reqDonut'),{
+        type:'doughnut',
+        data:{labels:['All docs complete','Has missing'],datasets:[{data:[ok,any],backgroundColor:donutColors,borderColor:'#fff',borderWidth:2}]},
+        options:{responsive:true,maintainAspectRatio:false,cutout:'70%',
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.raw.toLocaleString()}}},
+          onClick:(e,els)=>{if(!els.length)return;kpiFilterClick('rf-comp',donutKeys[els[0].index],reqDoFilter);}
+        }
+      });
+    }else{
+      reqDonutChart.data.datasets[0].data=[ok,any];
+      reqDonutChart.data.datasets[0].backgroundColor=donutColors;
+      reqDonutChart.update();
+    }
+  }
+
+  const barKeys=['peme','nbi','job','birth','educ'];
+  const barSel=barKeys.includes(curComp);
+  const barColors=barKeys.map(k=>(!barSel||k===curComp)?'#9C3B33':'#9C3B3355');
+
+  if(document.getElementById('reqBars')){
+    if(!reqBarChart){
+      reqBarChart=new Chart(document.getElementById('reqBars'),{
+        type:'bar',
+        data:{labels:['PEME','NBI','Job Contract','Birth Cert','Proof of Educ'],datasets:[{data:[pm,nm,jm,bm,em],backgroundColor:barColors,borderRadius:4,maxBarThickness:22}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toLocaleString()+' missing'}}},
+          scales:{x:{ticks:{color:'#5F6A7B',precision:0},grid:{color:'#EEF0F4'}},y:{ticks:{color:'#4A5568'},grid:{display:false}}},
+          onClick:(e,els)=>{if(!els.length)return;kpiFilterClick('rf-comp',barKeys[els[0].index],reqDoFilter);}
+        }
+      });
+    }else{
+      reqBarChart.data.datasets[0].data=[pm,nm,jm,bm,em];
+      reqBarChart.data.datasets[0].backgroundColor=barColors;
+      reqBarChart.update();
+    }
+  }
+
+  const cp=document.getElementById('req-count-pill');if(cp)cp.textContent=t.toLocaleString()+' records';
 }
 
 function reqRender(){
