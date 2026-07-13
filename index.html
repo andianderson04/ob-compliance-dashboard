@@ -1671,8 +1671,8 @@ function updateKPIs(){
     const bar=document.getElementById('statTileBar-'+key);
     const top=document.getElementById('statTileTop-'+key);
     if(!val||!tile)return;
-    const colorClass=rate>=95?'c-ok':rate>=85?'c-warn':'c-bad';
-    const barColor=rate>=95?'#2E6B4C':rate>=85?'#9C7A3C':'#9C3B33';
+    const colorClass=rate>=90?'c-ok':rate>=80?'c-warn':'c-bad';
+    const barColor=rate>=90?'#2E6B4C':rate>=80?'#9C7A3C':'#9C3B33';
     val.textContent=rate.toFixed(1)+'%';
     val.className='kpi-val '+colorClass;
     tile.classList.toggle('kpi-active',curComp===key);
