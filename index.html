@@ -1112,6 +1112,9 @@ const PAY_COLS = [
   {k:'sec',   label:'Section',             w:130},
   {k:'doj',   label:'Date of Joining',     w:115, mono:true},
   {k:'ps',    label:'Payroll Account',     w:180, ps:true},
+  {k:'l1',    label:'L1 Manager',          w:200},
+  {k:'l2',    label:'L2 Dept. Manager',    w:210},
+  {k:'l3',    label:'L3 Division Head',    w:210},
 ];
 
 const KEY_MAP = {
@@ -1259,7 +1262,8 @@ function applyPayrollData(data){
   payAll=data.map(r=>(({
     id:r.employee_code,name:r.employee_name,email:r.email,
     estat:r.employment_status,etype:r.employment_type,
-    branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining
+    branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining,
+    l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
   })));
   document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
   buildPayFilters();payDoFilter();
@@ -1436,7 +1440,8 @@ function processFile(buffer,status){
             const etypeNorm=(obj.etype||'').trim().toUpperCase();
             if((bankRaw===''||bankRaw==='0')&&etypeNorm!=='SEASONAL')bankRecords.push({
               id:obj.id,name:obj.name,email:obj.email,estat:obj.estat,etype:obj.etype,
-              branch:obj.branch,entity:obj.entity,dept:obj.dept,sec:obj.sec,doj:obj.doj,bankMissing:true
+              branch:obj.branch,entity:obj.entity,dept:obj.dept,sec:obj.sec,doj:obj.doj,
+              l1:obj.l1,l2:obj.l2,l3:obj.l3,bankMissing:true
             });
           }
         }
@@ -1459,7 +1464,8 @@ function processFile(buffer,status){
       const noBankRecords=(window._lastUploadedBankMap||[]).filter(r=>r.bankMissing).map(r=>({
         employee_code:r.id,employee_name:r.name,email:r.email,
         employment_status:r.estat,employment_type:r.etype,
-        branch:r.branch,entity:r.entity,department:r.dept,section:r.sec,date_of_joining:r.doj
+        branch:r.branch,entity:r.entity,department:r.dept,section:r.sec,date_of_joining:r.doj,
+        l1_manager:r.l1,l2_manager:r.l2,l3_manager:r.l3
       }));
       Promise.all([
         supabaseSave('statutory_data',statRecords),
@@ -1468,7 +1474,8 @@ function processFile(buffer,status){
         payAll=noBankRecords.map(r=>({
           id:r.employee_code,name:r.employee_name,email:r.email,
           estat:r.employment_status,etype:r.employment_type,
-          branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining
+          branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining,
+          l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
         }));
         document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
         buildPayFilters();payDoFilter();
