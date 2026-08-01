@@ -26,17 +26,17 @@
 body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:13px}
 
 /* HEADER */
-.header{background:linear-gradient(135deg,var(--navy-dark) 0%,var(--navy) 60%,var(--navy-mid) 100%);
+.header{background:var(--surface);
   padding:0 32px;display:flex;align-items:stretch;justify-content:space-between;gap:24px;
-  border-bottom:1px solid rgba(255,255,255,.06);box-shadow:0 4px 18px rgba(6,11,19,.35)}
+  border-bottom:1px solid var(--rule)}
 .header-brand{display:flex;align-items:center;gap:14px;padding:16px 0}
-.header-logo{width:38px;height:38px;flex-shrink:0;background:rgba(255,255,255,.1);
-  border:1px solid rgba(255,255,255,.18);border-radius:9px;display:grid;place-items:center}
+.header-logo{width:38px;height:38px;flex-shrink:0;background:var(--blue);
+  border:1px solid var(--blue);border-radius:9px;display:grid;place-items:center}
 .header-logo svg{width:22px;height:22px}
-.header-title{font-family:var(--display);font-size:26px;font-weight:600;color:#fff;letter-spacing:.005em}
-.header-sub{font-size:11px;color:rgba(255,255,255,.48);margin-top:3px;letter-spacing:.02em}
-.header-asof{font-size:10px;color:rgba(255,255,255,.38);margin-top:4px;font-style:italic;display:none}
-.header-asof strong{color:rgba(255,255,255,.62);font-style:normal}
+.header-title{font-family:var(--display);font-size:26px;font-weight:600;color:var(--ink);letter-spacing:.005em}
+.header-sub{font-size:11px;color:var(--ink-3);margin-top:3px;letter-spacing:.02em}
+.header-asof{font-size:10px;color:var(--ink-3);margin-top:4px;font-style:italic;display:none}
+.header-asof strong{color:var(--ink-2);font-style:normal}
 .sync-warning{display:none;align-items:center;justify-content:space-between;gap:14px;background:var(--warn-dim);border-bottom:1px solid #FBBF24;color:#92400E;padding:9px 20px;font-size:12.5px}
 .sync-warning .sw-text{display:flex;align-items:center;gap:8px}
 .sync-warning .sw-icon{font-size:14px}
@@ -44,31 +44,33 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .sync-warning button:hover{background:#F6E9CC}
 .sync-warning button:disabled{opacity:.6;cursor:default}
 .header-right{display:flex;align-items:center;gap:12px;padding:16px 0;
-  border-left:1px solid rgba(255,255,255,.08);padding-left:24px}
-.hdr-badge{background:rgba(255,255,255,.08);color:rgba(255,255,255,.78);
+  border-left:1px solid var(--rule);padding-left:24px}
+.hdr-badge{background:var(--canvas);color:var(--ink-2);
   font-family:var(--mono);font-size:10px;font-weight:500;padding:4px 10px;
-  border-radius:20px;letter-spacing:.04em;border:1px solid rgba(255,255,255,.13)}
-.btn-hdr{height:30px;padding:0 14px;background:rgba(255,255,255,.09);
-  border:1px solid rgba(255,255,255,.18);border-radius:5px;color:rgba(255,255,255,.85);
+  border-radius:20px;letter-spacing:.04em;border:1px solid var(--rule)}
+.btn-hdr{height:30px;padding:0 14px;background:var(--surface);
+  border:1px solid var(--rule);border-radius:5px;color:var(--ink-2);
   font-family:var(--display);font-size:11px;font-weight:500;cursor:pointer;
   display:flex;align-items:center;gap:6px;transition:all .15s;letter-spacing:.02em;white-space:nowrap}
-.btn-hdr:hover{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.3);}
+.btn-hdr:hover{background:var(--canvas);color:var(--ink);border-color:var(--ink-3);}
+.btn-hdr.btn-hdr-primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn-hdr.btn-hdr-primary:hover{background:#3730A3;border-color:#3730A3;color:#fff}
 .btn-hdr svg{width:12px;height:12px}
-.vdiv{width:1px;height:20px;background:rgba(255,255,255,.09)}
+.vdiv{width:1px;height:20px;background:var(--rule)}
 
 /* TABS */
 .app-shell{display:flex;align-items:flex-start}
 .main-content{flex:1;min-width:0}
-.tab-nav{background:var(--surface);border-right:1px solid var(--rule);padding:16px 12px;display:flex;flex-direction:column;gap:2px;width:216px;flex-shrink:0}
+.tab-nav{background:var(--surface);border-right:1px solid var(--rule);padding:16px 12px;display:flex;flex-direction:column;gap:2px;width:236px;flex-shrink:0}
 .tab-btn{height:auto;padding:9px 10px;background:none;border:none;border-radius:8px;border-left:3px solid transparent;
   font-family:var(--sans);font-size:13px;font-weight:500;color:var(--ink-2);cursor:pointer;
-  display:flex;align-items:center;gap:9px;transition:all .15s;white-space:nowrap;text-align:left}
+  display:flex;align-items:center;gap:9px;transition:all .15s;text-align:left}
 .tab-btn svg{width:16px;height:16px;flex-shrink:0}
-.tab-btn-label{flex:1}
+.tab-btn-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tab-btn.active{color:var(--blue);background:var(--blue-light);border-left-color:var(--blue)}
 .tab-btn:hover:not(.active){background:var(--canvas);color:var(--ink)}
 .tab-badge{font-size:10px;font-weight:600;font-family:var(--sans);padding:2px 7px;
-  border-radius:10px;background:var(--canvas);color:var(--ink-3);border:0.5px solid var(--rule)}
+  border-radius:10px;background:var(--canvas);color:var(--ink-3);border:0.5px solid var(--rule);flex-shrink:0}
 .tab-btn.active .tab-badge{background:var(--blue);color:#fff;border-color:var(--blue)}
 
 /* KPI STRIP */
@@ -298,7 +300,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
     </div>
     <div class="header-right">
       <span class="hdr-badge" id="hdr-count">&mdash;</span>
-      <span style="font-size:11px;color:rgba(255,255,255,.4)">employees</span>
+      <span style="font-size:11px;color:var(--ink-3)">employees</span>
       <div class="vdiv"></div>
       <button class="btn-hdr" onclick="exportConsolidated()" title="One file: every active/off-roster/off-detailing employee with both statutory and requirements status">
         <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -309,7 +311,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 9V1M4 4l3-3 3 3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Update Statutory
       </button>
-      <button class="btn-hdr" onclick="openModal('requirements')">
+      <button class="btn-hdr btn-hdr-primary" onclick="openModal('requirements')">
         <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 9V1M4 4l3-3 3 3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Update Requirements
       </button>
