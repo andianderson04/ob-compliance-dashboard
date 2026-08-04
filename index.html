@@ -156,9 +156,11 @@
       </div>
       <div class="actions">
         <button class="btn-ghost">📅 This month (Aug 1–3) ▾</button>
-        <button class="btn-ghost">⬇ Consolidated report</button>
-        <button class="btn-ghost">⬆ Update statutory</button>
-        <button class="btn-primary">↑ Update requirements</button>
+        <button class="btn-ghost" id="consolidatedBtn">⬇ Consolidated report</button>
+        <button class="btn-ghost" id="updateStatutoryBtn">⬆ Update statutory</button>
+        <input type="file" id="statutoryFile" accept=".csv,.xlsx" style="display:none;">
+        <button class="btn-primary" id="updateRequirementsBtn">↑ Update requirements</button>
+        <input type="file" id="requirementsFile" accept=".csv,.xlsx" style="display:none;">
       </div>
     </div>
 
@@ -211,7 +213,7 @@
         <button class="btn-ghost" id="colsBtn">⚙ Columns</button>
         <div class="cols-panel" id="colsPanel"></div>
       </div>
-      <button class="btn-ghost">↓ Export</button>
+      <button class="btn-ghost" id="exportBtn">↓ Export</button>
     </div>
 
     <div class="table-wrap">
@@ -407,6 +409,54 @@ document.getElementById("colsBtn").addEventListener("click",(e)=>{
 });
 document.addEventListener("click",()=> colsPanel.classList.remove("open"));
 colsPanel.addEventListener("click", e=>e.stopPropagation());
+
+// --- Real, working functionality for the four action buttons ---
+
+function downloadCSV(filename, rows, headers){
+  const esc = v => `"${String(v).replace(/"/g,'""')}"`;
+  const csv = [headers.map(esc).join(",")].concat(
+    rows.map(r=>headers.map(h=>esc(r[h.toLowerCase().replace(/[^a-z0-9]/g,"")] ?? "")).join(","))
+  ).join("\r\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Export: downloads a real CSV of whatever's currently filtered in the table
+document.getElementById("exportBtn").addEventListener("click", ()=>{
+  const rows = getFiltered().map(e=>({
+    employeecode:e.code, employeename:e.name, emailaddress:e.email, status:"Active",
+    emptype:e.empType, designation:e.designation, branch:e.branch, entity:e.entity, department:e.dept,
+    section:e.section, internalorder:e.internalOrder, dateofjoining:e.dateOfJoining,
+    tin:e.missing.includes("TIN")?"Missing":"OK", sss:e.missing.includes("SSS")?"Missing":"OK",
+    pagibig:e.missing.includes("Pag-IBIG")?"Missing":"OK", philhealth:e.missing.includes("PhilHealth")?"Missing":"OK",
+    compliancestatus:e.missing.length?"INCOMPLETE":"COMPLETE", l1manager:e.l1, l2deptmanager:e.l2, l3depthead:e.l3
+  }));
+  downloadCSV("compliance-export.csv", rows,
+    ["Employee code","Employee name","Email address","Status","Emp type","Designation","Branch","Entity","Department",
+     "Section","Internal order","Date of joining","TIN","SSS","Pag-IBIG","PhilHealth","Compliance status","L1 manager","L2 dept manager","L3 dept head"]);
+});
+
+// Consolidated report: downloads a real CSV summary of the KPI cards
+document.getElementById("consolidatedBtn").addEventListener("click", ()=>{
+  const rows = kpiData.map(k=>({item:k.key, complianceatplaceholder:k.pct+"%", missing:k.missing, vsapr:"+"+k.delta+"%"}));
+  downloadCSV("consolidated-compliance-report.csv", rows, ["Item","Compliance %","Missing","vs Apr"]);
+});
+
+// Update statutory / Update requirements: open a real file picker and confirm the selection
+document.getElementById("updateStatutoryBtn").addEventListener("click", ()=> document.getElementById("statutoryFile").click());
+document.getElementById("statutoryFile").addEventListener("change", (e)=>{
+  const f = e.target.files[0];
+  if(f) alert(`Selected "${f.name}" — in the live dashboard this uploads to the statutory-numbers pipeline in Supabase.`);
+});
+document.getElementById("updateRequirementsBtn").addEventListener("click", ()=> document.getElementById("requirementsFile").click());
+document.getElementById("requirementsFile").addEventListener("change", (e)=>{
+  const f = e.target.files[0];
+  if(f) alert(`Selected "${f.name}" — in the live dashboard this uploads to the requirements pipeline in Supabase.`);
+});
 </script>
 </body>
 </html>
