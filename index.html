@@ -92,7 +92,9 @@
   .cols-panel label{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5px 2px;color:var(--text-2);cursor:pointer;}
   .cols-panel .hint{font-size:11px;color:var(--text-3);margin-bottom:6px;}
   th,td{padding:11px 12px;text-align:left;font-size:12.5px;white-space:nowrap;}
-  th{color:var(--text-3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid var(--border);white-space:nowrap;}
+  th{color:var(--text-3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+  th:hover{color:var(--text-2);}
+  th .arrow{font-size:9px;margin-left:3px;opacity:.6;}
   tbody tr{border-bottom:1px solid var(--border);}
   tbody tr:hover{background:#fafafc;}
   .status{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--green-tint);color:var(--green);}
@@ -315,7 +317,8 @@ for(let i=0;i<40;i++){
     risk: nMissing>=2?"high":(nMissing===1?"medium":"low")
   });
 }
-employees.sort((a,b)=> a.comp - b.comp);
+let sortKey = "dateOfJoining", sortDir = 1; // dashboard default: date of joining, oldest first
+employees.sort((a,b)=> a.dateOfJoining.localeCompare(b.dateOfJoining));
 
 function iconFor(e, item){
   if(!e.missing.includes(item)) return '<span class="badge-ic badge-pass">✓</span>';
@@ -329,6 +332,31 @@ depts.forEach(d=>deptSel.insertAdjacentHTML("beforeend",`<option value="${d}">${
 entities.forEach(en=>entitySel.insertAdjacentHTML("beforeend",`<option value="${en}">${en}</option>`));
 empTypes.forEach(et=>empTypeSel.insertAdjacentHTML("beforeend",`<option value="${et}">${et}</option>`));
 
+function sortValue(e, key){
+  switch(key){
+    case "code": return e.code;
+    case "name": return e.name;
+    case "email": return e.email;
+    case "status": return "Active";
+    case "empType": return e.empType;
+    case "designation": return e.designation;
+    case "branch": return e.branch;
+    case "entity": return e.entity;
+    case "dept": return e.dept;
+    case "section": return e.section;
+    case "io": return e.internalOrder;
+    case "doj": return e.dateOfJoining;
+    case "tin": return e.missing.includes("TIN")?1:0;
+    case "sss": return e.missing.includes("SSS")?1:0;
+    case "pagibig": return e.missing.includes("Pag-IBIG")?1:0;
+    case "philhealth": return e.missing.includes("PhilHealth")?1:0;
+    case "cstatus": return e.missing.length;
+    case "l1": return e.l1;
+    case "l2": return e.l2;
+    case "l3": return e.l3;
+    default: return "";
+  }
+}
 function getFiltered(){
   const q=searchEl.value.toLowerCase();
   return employees.filter(e=>{
@@ -340,6 +368,10 @@ function getFiltered(){
     if(statusSel.value==="high" && e.risk!=="high") return false;
     if(statusSel.value==="low" && e.comp<100) return false;
     return true;
+  }).sort((a,b)=>{
+    let av=sortValue(a,sortKey), bv=sortValue(b,sortKey);
+    if(typeof av === "string") return sortDir*av.localeCompare(bv);
+    return sortDir*(av-bv);
   });
 }
 function render(){
@@ -371,10 +403,27 @@ function render(){
       <td class="kebab">⋮</td>
     </tr>
   `).join("");
+  document.querySelectorAll("th[data-col]").forEach(th=>{
+    const arrow = th.querySelector(".arrow");
+    if(arrow) arrow.remove();
+    if(th.dataset.col === sortKey){
+      th.insertAdjacentHTML("beforeend", `<span class="arrow">${sortDir===1?'▲':'▼'}</span>`);
+    }
+  });
 }
+document.querySelectorAll("th[data-col]").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key = th.dataset.col;
+    sortDir = (sortKey===key) ? -sortDir : 1;
+    sortKey = key;
+    render();
+  });
+});
 [searchEl,branchSel,deptSel,statusSel,entitySel,empTypeSel].forEach(el=>el.addEventListener("input",render));
 document.getElementById("clearAll").addEventListener("click",()=>{
-  searchEl.value="";branchSel.value="";deptSel.value="";statusSel.value="";entitySel.value="";empTypeSel.value="";render();
+  searchEl.value="";branchSel.value="";deptSel.value="";statusSel.value="";entitySel.value="";empTypeSel.value="";
+  sortKey="dateOfJoining"; sortDir=1;
+  render();
 });
 render();
 
