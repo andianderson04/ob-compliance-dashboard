@@ -33,10 +33,11 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .header-logo{width:38px;height:38px;flex-shrink:0;background:var(--blue);
   border:1px solid var(--blue);border-radius:9px;display:grid;place-items:center}
 .header-logo svg{width:22px;height:22px}
+.header-title-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .header-title{font-family:var(--display);font-size:26px;font-weight:600;color:var(--ink);letter-spacing:.005em}
+.header-greeting-pill{font-family:var(--sans);font-size:12.5px;font-weight:500;color:var(--blue);
+  background:var(--blue-light);padding:5px 12px;border-radius:20px;white-space:nowrap}
 .header-sub{font-size:11px;color:var(--ink-3);margin-top:3px;letter-spacing:.02em}
-.header-asof{font-size:10px;color:var(--ink-3);margin-top:4px;font-style:italic;display:none}
-.header-asof strong{color:var(--ink-2);font-style:normal}
 .sync-warning{display:none;align-items:center;justify-content:space-between;gap:14px;background:var(--warn-dim);border-bottom:1px solid #FBBF24;color:#92400E;padding:9px 20px;font-size:12.5px}
 .sync-warning .sw-text{display:flex;align-items:center;gap:8px}
 .sync-warning .sw-icon{font-size:14px}
@@ -73,7 +74,7 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
   border-radius:10px;background:var(--canvas);color:var(--ink-3);border:0.5px solid var(--rule);flex-shrink:0}
 .sidebar-collapse-btn{height:auto;padding:9px 10px;background:none;border:none;border-radius:8px;
   font-family:var(--sans);font-size:12.5px;font-weight:500;color:var(--ink-3);cursor:pointer;
-  display:flex;align-items:center;gap:9px;transition:all .15s;text-align:left;margin-top:auto}
+  display:flex;align-items:center;gap:9px;transition:all .15s;text-align:left}
 .sidebar-collapse-btn svg{width:16px;height:16px;flex-shrink:0;transition:transform .2s}
 .sidebar-collapse-btn:hover{background:var(--canvas);color:var(--ink)}
 .tab-nav.collapsed{width:64px}
@@ -133,6 +134,17 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .toolbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
 .rec-pill{font-family:var(--mono);font-size:11px;color:var(--ink-3);background:var(--canvas);
   border:1px solid var(--rule);padding:4px 10px;border-radius:20px}
+.col-picker-wrap{position:relative}
+.btn-icon-only{height:32px;width:32px;display:flex;align-items:center;justify-content:center;
+  background:var(--surface);border:1px solid var(--rule);border-radius:5px;color:var(--ink-2);cursor:pointer;transition:all .15s}
+.btn-icon-only svg{width:15px;height:15px}
+.btn-icon-only:hover{background:var(--canvas);color:var(--ink);border-color:var(--ink-3)}
+.column-picker{position:absolute;top:38px;right:0;background:#fff;border:1px solid var(--rule);border-radius:8px;
+  box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;width:200px;z-index:50;max-height:320px;overflow-y:auto}
+.column-picker-label{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:2px 6px 8px}
+.column-picker-item{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:5px;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.column-picker-item:hover{background:var(--canvas)}
+.column-picker-item input{cursor:pointer}
 .btn-export{height:32px;padding:0 14px;background:var(--navy);color:#fff;border:none;
   border-radius:5px;font-family:var(--display);font-size:12px;font-weight:500;cursor:pointer;
   display:flex;align-items:center;gap:6px;transition:background .15s}
@@ -325,9 +337,11 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         </svg>
       </div>
       <div>
-        <div class="header-title">TA&#8209;Onboarding Compliance Dashboard</div>
-        <div class="header-sub">Statutory numbers &middot; Requirements &middot; Payroll &mdash; Active, Off-Roster &amp; Off-Detailing</div>
-        <div class="header-asof" id="header-asof">Data updated as of <strong id="asof-date"></strong></div>
+        <div class="header-title-row">
+          <div class="header-title">TA&#8209;Onboarding Compliance Dashboard</div>
+          <span class="header-greeting-pill" id="header-greeting">&mdash;</span>
+        </div>
+        <div class="header-sub" id="header-overview-sub">Here's your compliance overview.</div>
       </div>
     </div>
     <div class="header-right">
@@ -370,7 +384,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
       <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 6l6-4 6 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 6.5v6h10v-6" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 9v2.5M9.5 9v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
       <span class="tab-btn-label">RCBC Payroll</span><span class="tab-badge" id="tab-cnt-payroll">&mdash;</span>
     </button>
-    <div class="sidebar-section-label">Quick Actions</div>
+    <div class="sidebar-section-label" style="margin-top:auto">Quick Actions</div>
     <button class="sidebar-action-btn" onclick="openModal('statutory')">
       <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 10V2M5 5l3-3 3 3M2.5 11v1.5a1 1 0 001 1h9a1 1 0 001-1V11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-btn-label">Update Statutory</span>
@@ -467,6 +481,15 @@ tbody tr:hover td:first-child{background:#F7F4EC}
       <div class="tdiv"></div>
       <div class="toolbar-right">
         <span class="rec-pill" id="count-pill">&mdash;</span>
+        <div class="col-picker-wrap">
+          <button class="btn-icon-only" onclick="toggleColumnPicker(event)" title="Show/hide columns">
+            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.3"/><path d="M13 8.6v-1.2l-1.4-.3a4.4 4.4 0 00-.5-1.3l.8-1.2-.9-.9-1.2.8a4.4 4.4 0 00-1.3-.5L8.2 2.6H7l-.3 1.4a4.4 4.4 0 00-1.3.5l-1.2-.8-.9.9.8 1.2a4.4 4.4 0 00-.5 1.3L2.2 7.4v1.2l1.4.3c.1.5.3.9.5 1.3l-.8 1.2.9.9 1.2-.8c.4.2.9.4 1.3.5l.3 1.4h1.2l.3-1.4c.5-.1.9-.3 1.3-.5l1.2.8.9-.9-.8-1.2c.2-.4.4-.9.5-1.3l1.4-.3z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="column-picker" id="column-picker" style="display:none">
+            <div class="column-picker-label">Show columns</div>
+            <div id="column-picker-list"></div>
+          </div>
+        </div>
         <button class="btn-export" onclick="exportXLSX()">
           <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Export
@@ -1138,24 +1161,24 @@ const PW_HASH  = '81cf335b9d9087c7ffcec69131c02eed5b84ec02476a740cacb000303715f1
 const COLS = [
   {k:'id',    label:'Employee Code',       w:120, mono:true},
   {k:'name',  label:'Employee Name',       w:260},
-  {k:'email', label:'Email Address',       w:220},
+  {k:'email', label:'Email Address',       w:220, hide:true},
   {k:'estat', label:'Status',             w:100, status:true},
   {k:'etype', label:'Emp. Type',           w:110},
-  {k:'desig', label:'Designation',         w:200},
+  {k:'desig', label:'Designation',         w:200, hide:true},
   {k:'branch',label:'Branch',              w:100},
-  {k:'entity',label:'Entity',              w:220},
+  {k:'entity',label:'Entity',              w:220, hide:true},
   {k:'dept',  label:'Department',          w:165},
-  {k:'sec',   label:'Section',             w:130},
-  {k:'intOrder', label:'Internal Order',   w:120, mono:true},
-  {k:'doj',   label:'Date of Joining',     w:115, mono:true},
+  {k:'sec',   label:'Section',             w:130, hide:true},
+  {k:'intOrder', label:'Internal Order',   w:120, mono:true, hide:true},
+  {k:'doj',   label:'Date of Joining',     w:115, mono:true, hide:true},
   {k:'tin',   label:'TIN',                 w:58,  comp:true},
   {k:'sss',   label:'SSS',                 w:58,  comp:true},
   {k:'pag',   label:'Pag-IBIG',            w:72,  comp:true},
   {k:'ph',    label:'PhilHealth',          w:82,  comp:true},
   {k:'cs',    label:'Compliance Status',   w:150, cs:true},
-  {k:'l1',    label:'L1 Manager',          w:200},
-  {k:'l2',    label:'L2 Dept. Manager',    w:210},
-  {k:'l3',    label:'L3 Division Head',    w:210},
+  {k:'l1',    label:'L1 Manager',          w:200, hide:true},
+  {k:'l2',    label:'L2 Dept. Manager',    w:210, hide:true},
+  {k:'l3',    label:'L3 Division Head',    w:210, hide:true},
 ];
 
 const REQ_COLS = [
@@ -1430,6 +1453,7 @@ async function retrySyncAll(){
 
 /* ── INIT ── */
 async function init(){
+  document.getElementById('header-greeting').textContent=getGreeting();
   // 1. Load embedded immediately
   const json=await decompress(EMBEDDED_B64);
   all=JSON.parse(json);
@@ -1437,7 +1461,7 @@ async function init(){
   document.getElementById('app').style.display='block';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
   document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
-  buildFilters(); buildHead(); doFilter();
+  buildFilters(); buildHead(); buildColumnPicker(); doFilter();
   animateNum(document.getElementById('statDonutRate'));
   initReqs(); initPayroll();
   // 2. Background: check Supabase for fresher data (no artificial delay, no total-time cap —
@@ -1500,13 +1524,20 @@ function relativeTime(date){
   const days=Math.floor(hours/24);
   return days+' day'+(days===1?'':'s')+' ago';
 }
+function getGreeting(){
+  const h=new Date().getHours();
+  if(h>=5&&h<12)return'Rise and shine! \u2600\ufe0f';
+  if(h>=12&&h<17)return'Powering through the day? \u26a1';
+  if(h>=17&&h<21)return'Winding down? \ud83c\udf06';
+  return'Burning the midnight oil? \ud83c\udf19';
+}
 function setAsOfDate(date){
   const d=date||new Date();
   lastAsOfDate=d;
   const dateOpts={year:'numeric',month:'long',day:'numeric'};
   const hour=d.toLocaleTimeString('en-PH',{hour:'numeric',hour12:true}).replace(':00','');
-  document.getElementById('asof-date').textContent=d.toLocaleDateString('en-PH',dateOpts)+' at '+hour;
-  document.getElementById('header-asof').style.display='block';
+  const overviewSub=document.getElementById('header-overview-sub');
+  if(overviewSub)overviewSub.textContent="Here's your compliance overview as of "+d.toLocaleDateString('en-PH',dateOpts)+' at '+hour+'.';
   const sidebarAsof=document.getElementById('sidebar-asof');
   const sidebarDate=document.getElementById('sidebar-asof-date');
   if(sidebarAsof&&sidebarDate){
@@ -1760,10 +1791,39 @@ function buildFilters(){
   fill('f-branch',s.branch,'All branches');fill('f-etype',s.etype,'All emp. types');
 }
 
+function buildColumnPicker(){
+  const list=document.getElementById('column-picker-list');
+  if(!list)return;
+  list.innerHTML=COLS.map(c=>`
+    <label class="column-picker-item">
+      <input type="checkbox" ${c.hide?'':'checked'} onchange="toggleColumn('${c.k}',this.checked)">
+      ${esc(c.label)}
+    </label>`).join('');
+}
+function toggleColumn(key,visible){
+  const col=COLS.find(c=>c.k===key);
+  if(col)col.hide=!visible;
+  buildHead();
+  render();
+}
+function toggleColumnPicker(e){
+  if(e)e.stopPropagation();
+  const picker=document.getElementById('column-picker');
+  if(!picker)return;
+  picker.style.display=picker.style.display==='none'?'block':'none';
+}
+document.addEventListener('click',e=>{
+  const picker=document.getElementById('column-picker');
+  const wrap=document.querySelector('.col-picker-wrap');
+  if(picker&&picker.style.display==='block'&&wrap&&!wrap.contains(e.target)){
+    picker.style.display='none';
+  }
+});
+
 function buildHead(){
   const tr=document.getElementById('thead-row');
   tr.innerHTML='';
-  COLS.forEach(c=>{
+  COLS.filter(c=>!c.hide).forEach(c=>{
     const th=document.createElement('th');
     th.style.minWidth=c.w+'px';
     th.innerHTML=c.label+' <span class="arr" id="arr-'+c.k+'">&#8597;</span>';
@@ -1892,7 +1952,7 @@ function render(){
   const totalP=Math.max(1,Math.ceil(filtered.length/perPage));
   page=Math.min(Math.max(1,page),totalP);
   const s=(page-1)*perPage,e=Math.min(s+perPage,filtered.length);
-  document.getElementById('tbody').innerHTML=filtered.slice(s,e).map(r=>`<tr>${COLS.map(c=>{
+  document.getElementById('tbody').innerHTML=filtered.slice(s,e).map(r=>`<tr>${COLS.filter(c=>!c.hide).map(c=>{
     const v=r[c.k]||'';
     if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'&#10003;':'&#10007;'}</span></td>`;}
     if(c.cs){const ok=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';return `<td class="comp-cell"><span class="comp-pill ${ok?'comp-ok':'comp-no'}">${ok?'COMPLETE':'INCOMPLETE'}</span></td>`;}
