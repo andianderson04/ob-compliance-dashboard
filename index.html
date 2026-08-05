@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="dashboard-version" content="20260701121327">
 <title>TA-Onboarding Compliance Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231e3a5f'/%3E%3Cpath d='M7 10h18M7 16h12M7 22h15' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='24' cy='22' r='5' fill='%232d7dd2'/%3E%3Cpath d='M22.5 22l1.2 1.2 2.3-2.3' stroke='%23fff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root{
@@ -20,7 +20,7 @@
   --danger:#EF4444;--danger-dim:#FEE2E2;
   --success:#16A34A;--success-dim:#DCFCE7;
   --warn-dim:#FEF3C7;
-  --mono:'Inter',sans-serif;--sans:'Inter',sans-serif;--display:'Geist',sans-serif;
+  --mono:'Inter',sans-serif;--sans:'Inter',sans-serif;--display:'Hanken Grotesk',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:13px}
@@ -51,7 +51,7 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
   font-family:var(--mono);font-size:10px;font-weight:500;padding:4px 10px;
   border-radius:20px;letter-spacing:.04em;border:1px solid var(--rule)}
 .btn-hdr{height:30px;padding:0 14px;background:var(--surface);
-  border:1px solid var(--rule);border-radius:5px;color:var(--ink-2);
+  border:1px solid var(--rule);border-radius:8px;color:var(--ink-2);
   font-family:var(--display);font-size:11px;font-weight:500;cursor:pointer;
   display:flex;align-items:center;gap:6px;transition:all .15s;letter-spacing:.02em;white-space:nowrap}
 .btn-hdr:hover{background:var(--canvas);color:var(--ink);border-color:var(--ink-3);}
@@ -96,6 +96,8 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .sidebar-asof-dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0}
 .tab-nav.collapsed .sidebar-asof{display:none!important}
 .tab-btn.active .tab-badge{background:var(--blue);color:#fff;border-color:var(--blue)}
+.tab-badge-warn{background:var(--danger-dim)!important;color:#B91C1C!important;border-color:#FCA5A5!important}
+.tab-btn.active .tab-badge-warn{background:var(--danger)!important;color:#fff!important;border-color:var(--danger)!important}
 
 /* KPI STRIP */
 .kpi-strip{display:grid;border-bottom:1px solid var(--rule);background:var(--surface)}
@@ -108,7 +110,7 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .tile-label-row .kpi-label{margin-bottom:0}
 .tile-icon{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .tile-icon svg{width:12px;height:12px}
-.kpi-val{font-family:var(--sans);font-size:26px;font-weight:600;color:var(--ink);letter-spacing:-.01em;line-height:1}
+.kpi-val{font-family:var(--display);font-size:26px;font-weight:600;color:var(--ink);letter-spacing:-.01em;line-height:1}
 .kpi-val.c-ok{color:#16A34A}.kpi-val.c-bad{color:var(--danger)}.kpi-val.c-warn{color:#F59E0B}
 .kpi-sub{font-size:10px;color:var(--ink-3);margin-top:4px}
 
@@ -118,15 +120,15 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .search-wrap{position:relative;flex:1;min-width:220px;max-width:300px}
 .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink-3);width:14px;height:14px}
 .search-wrap input{width:100%;height:32px;padding:0 10px 0 32px;border:1px solid var(--rule);
-  border-radius:5px;font-family:var(--sans);font-size:12px;color:var(--ink);
+  border-radius:8px;font-family:var(--sans);font-size:12px;color:var(--ink);
   background:var(--canvas);outline:none;transition:border .15s}
 .search-wrap input:focus{border-color:var(--blue);background:#fff}
-.filter-sel{height:32px;padding:0 26px 0 10px;border:1px solid var(--rule);border-radius:5px;
+.filter-sel{height:32px;padding:0 26px 0 10px;border:1px solid var(--rule);border-radius:8px;
   font-family:var(--sans);font-size:12px;color:var(--ink);
   background:var(--canvas) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235f6a7b'/%3E%3C/svg%3E") no-repeat right 9px center;
   appearance:none;outline:none;cursor:pointer;transition:border .15s}
 .filter-sel:focus{border-color:var(--blue);background-color:#fff}
-.btn-clear-filters{height:32px;padding:0 10px;background:none;border:none;border-radius:5px;
+.btn-clear-filters{height:32px;padding:0 10px;background:none;border:none;border-radius:8px;
   font-family:var(--sans);font-size:12px;font-weight:500;color:var(--ink-3);cursor:pointer;
   display:flex;align-items:center;gap:5px;white-space:nowrap;transition:all .15s}
 .btn-clear-filters:hover{color:var(--blue);background:var(--blue-light)}
@@ -137,7 +139,7 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
   border:1px solid var(--rule);padding:4px 10px;border-radius:20px}
 .col-picker-wrap{position:relative}
 .btn-icon-only{height:32px;width:32px;display:flex;align-items:center;justify-content:center;
-  background:var(--surface);border:1px solid var(--rule);border-radius:5px;color:var(--ink-2);cursor:pointer;transition:all .15s}
+  background:var(--surface);border:1px solid var(--rule);border-radius:8px;color:var(--ink-2);cursor:pointer;transition:all .15s}
 .btn-icon-only svg{width:15px;height:15px}
 .btn-icon-only:hover{background:var(--canvas);color:var(--ink);border-color:var(--ink-3)}
 .column-picker{position:absolute;top:38px;right:0;background:#fff;border:1px solid var(--rule);border-radius:8px;
@@ -147,7 +149,7 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .column-picker-item:hover{background:var(--canvas)}
 .column-picker-item input{cursor:pointer}
 .btn-export{height:32px;padding:0 14px;background:var(--navy);color:#fff;border:none;
-  border-radius:5px;font-family:var(--display);font-size:12px;font-weight:500;cursor:pointer;
+  border-radius:8px;font-family:var(--display);font-size:12px;font-weight:500;cursor:pointer;
   display:flex;align-items:center;gap:6px;transition:background .15s}
 .btn-export:hover{background:var(--navy-mid)}
 .btn-export svg{width:13px;height:13px}
@@ -192,16 +194,15 @@ tbody tr:hover td{background:#F7F4EC}
 .tile-top strong{color:var(--ink-2);font-weight:600}
 
 /* CHART PANELS (replace card grids on Statutory + Requirements) */
-.chart-strip{display:grid;grid-template-columns:0.9fr 1.3fr 1fr;gap:0;border-bottom:1px solid var(--rule);background:var(--surface)}
-.chart-panel{padding:18px 20px;border-right:1px solid var(--rule)}
-.chart-panel:last-child{border-right:none}
+.chart-strip{display:grid;grid-template-columns:0.9fr 1.3fr 1fr;gap:16px;padding:20px 24px 0;background:transparent}
+.chart-panel{padding:18px 20px;border:1px solid var(--rule-light);border-radius:14px;background:var(--surface);box-shadow:0 1px 2px rgba(15,23,42,.05),0 2px 6px rgba(15,23,42,.04)}
 .chart-panel-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
 .chart-panel-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .chart-panel-total{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
 .chart-canvas-wrap{position:relative;height:180px}
 .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;transition:background .15s}
 .donut-center:hover{background:rgba(0,0,0,.03)}
-.donut-center-val{font-family:var(--sans);font-size:28px;font-weight:600;color:var(--ink)}
+.donut-center-val{font-family:var(--display);font-size:28px;font-weight:600;color:var(--ink)}
 .donut-center-sub{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
 .chart-legend{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--ink-2)}
 .chart-empty{font-size:11.5px;color:var(--ink-3);text-align:center;padding:30px 10px;font-style:italic}
@@ -215,6 +216,52 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 .kpi-item.kpi-click:hover{background:var(--canvas)}
 .kpi-item.kpi-click.sel{background:var(--blue-light)}
 .kpi-item.kpi-click.sel::before{background:var(--blue);opacity:1}
+
+/* OVERVIEW: 5-CARD KPI ROW */
+.kpi5-strip{display:grid;grid-template-columns:1.7fr 1fr 1fr 1fr 1fr;gap:16px;padding:20px 24px 0;background:transparent}
+.stat-card{padding:16px 18px;border:1px solid var(--rule-light);border-radius:14px;background:var(--surface);box-shadow:0 1px 2px rgba(15,23,42,.05),0 2px 6px rgba(15,23,42,.04)}
+.stat-card-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.stat-card-icon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-card-icon svg{width:14px;height:14px}
+.stat-card-label{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.stat-card-val{font-family:var(--display);font-size:26px;font-weight:600;color:var(--ink);letter-spacing:-.01em;line-height:1}
+.stat-card-sub{font-size:10.5px;color:var(--ink-3);margin-top:5px}
+.stat-card-overall{display:flex;align-items:center;gap:18px}
+.stat-card-overall .chart-canvas-wrap{width:110px;height:110px;flex-shrink:0}
+.stat-card-overall .donut-center-val{font-size:22px}
+.stat-card-legend{display:flex;flex-direction:column;gap:8px}
+.stat-card-legend-row{display:flex;align-items:baseline;gap:6px;font-size:12px;color:var(--ink-2)}
+.stat-card-legend-row i{display:inline-block;width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.stat-card-legend-row strong{color:var(--ink);font-weight:600}
+.stat-card-legend-row em{font-style:normal;color:var(--ink-3);font-size:11px}
+.chart-strip-2{grid-template-columns:1.4fr 1fr}
+.chart-strip-3{grid-template-columns:1.25fr 0.85fr 0.9fr}
+
+/* OVERVIEW: FOCUS AREAS */
+.focus-strip{display:grid;grid-template-columns:1fr 1.7fr;gap:16px;padding:20px 24px 24px;background:transparent}
+.focus-alert{padding:10px 0;border-bottom:1px solid var(--rule-light)}
+.focus-alert:last-child{border-bottom:none}
+.focus-alert-label{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
+.focus-alert-name{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.focus-alert-meta .kpi-val{font-size:20px}
+.focus-alert-sub{font-size:11px;color:var(--ink-3);margin-top:2px}
+.lb-list{display:flex;flex-direction:column;gap:9px;max-height:200px;overflow-y:auto;padding-right:4px;margin-top:2px}
+.lb-row{display:flex;align-items:center;gap:10px}
+.lb-name{font-size:12px;color:var(--ink-2);width:118px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-bar-track{flex:1;height:7px;background:var(--rule-light);border-radius:4px;overflow:hidden}
+.lb-bar-fill{height:100%;border-radius:4px;transition:width .3s ease}
+.lb-rate{font-size:12px;font-weight:600;color:var(--ink);width:38px;text-align:right;flex-shrink:0}
+.focus-strip-3{grid-template-columns:0.8fr 1fr 1.2fr}
+.issue-list{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.issue-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--rule-light)}
+.issue-row:last-child{border-bottom:none}
+.issue-icon{width:22px;height:22px;border-radius:6px;background:#FEF3C7;color:#B45309;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.issue-icon svg{width:12px;height:12px}
+.issue-text{min-width:0;flex:1}
+.issue-branch{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.issue-detail{font-size:11px;color:var(--ink-3);margin-top:1px}
+.issue-count{font-size:14px;font-weight:600;color:var(--ink);flex-shrink:0}
+.issue-empty{font-size:11.5px;color:var(--ink-3);text-align:center;padding:20px 10px;font-style:italic}
 
 /* PILLS */
 .status-pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
@@ -373,7 +420,11 @@ tbody tr:hover td:first-child{background:#F7F4EC}
   <div class="app-shell">
   <!-- TABS -->
   <div class="tab-nav">
-    <button class="tab-btn active" id="tab-btn-statutory" onclick="switchTab('statutory')">
+    <button class="tab-btn active" id="tab-btn-overview" onclick="switchTab('overview')">
+      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+      <span class="tab-btn-label">Overview</span>
+    </button>
+    <button class="tab-btn" id="tab-btn-statutory" onclick="switchTab('statutory')">
       <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 8l1.8 1.8L10.5 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="tab-btn-label">Statutory Numbers</span><span class="tab-badge" id="tab-cnt-statutory">&mdash;</span>
     </button>
@@ -410,27 +461,51 @@ tbody tr:hover td:first-child{background:#F7F4EC}
   </div>
 
   <div class="main-content">
-  <!-- STATUTORY KPI (injected by JS) -->
-  <div id="stat-kpi-wrap">
-    <div class="chart-strip">
-      <div class="chart-panel">
-        <div class="chart-panel-head"><span class="chart-panel-label">Compliance split</span><span class="chart-panel-total" id="statChartTotal">&mdash;</span></div>
+  <!-- OVERVIEW (landing page, injected by JS) -->
+  <div id="section-overview">
+    <div class="kpi5-strip">
+      <div class="stat-card stat-card-overall">
         <div class="chart-canvas-wrap">
-          <canvas id="statDonut" role="img" aria-label="Donut chart of fully compliant versus has missing employees"></canvas>
-          <div class="donut-center" id="statDonutCenter" onclick="kpiFilterClick('f-comp','',doFilter)" title="Click to view all employees">
-            <div class="donut-center-val" id="statDonutRate">&mdash;</div>
+          <canvas id="ovDonut" role="img" aria-label="Donut chart of fully compliant versus has missing employees"></canvas>
+          <div class="donut-center" id="ovDonutCenter" onclick="switchTab('statutory');kpiFilterClick('f-comp','',doFilter)" title="Click to view all employees">
+            <div class="donut-center-val" id="ovDonutRate">&mdash;</div>
             <div class="donut-center-sub">compliant</div>
           </div>
         </div>
-        <div class="chart-legend" id="statDonutLegend"></div>
+        <div style="flex:1;min-width:0">
+          <div class="stat-card-label" style="margin-bottom:10px">Overall Compliance</div>
+          <div class="stat-card-legend" id="ovDonutLegend"></div>
+        </div>
       </div>
+      <div class="stat-card">
+        <div class="stat-card-head"><span class="stat-card-icon" style="background:#EEF2FF;color:#4338CA"><svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.3" stroke="currentColor" stroke-width="1.2"/><path d="M2 13c0-2.2 1.8-3.6 4-3.6s4 1.4 4 3.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M10.5 3.2c1 .2 1.8 1 1.8 2.1s-.8 1.9-1.8 2.1M12 9.6c1.6.3 2.5 1.3 2.5 2.7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg></span><span class="stat-card-label">Total Employees</span></div>
+        <div class="stat-card-val" id="ovTotalEmp-val">&mdash;</div>
+        <div class="stat-card-sub" id="ovTotalEmp-sub">&mdash;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-head"><span class="stat-card-icon" style="background:#FEE2E2;color:#DC2626"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8l6.5 11.4a1 1 0 01-.9 1.5H2.4a1 1 0 01-.9-1.5L8 1.8z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6.3v3M8 11.3h.007" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span class="stat-card-label">Need Action</span></div>
+        <div class="stat-card-val" id="ovNeedAction-val">&mdash;</div>
+        <div class="stat-card-sub" id="ovNeedAction-sub">&mdash;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-head"><span class="stat-card-icon" style="background:#FFF7ED;color:#C2410C"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 6.8h13" stroke="currentColor" stroke-width="1.2"/><path d="M4 10h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span><span class="stat-card-label">Payroll Incomplete</span></div>
+        <div class="stat-card-val" id="ovPayrollIncomplete-val">&mdash;</div>
+        <div class="stat-card-sub" id="ovPayrollIncomplete-sub">&mdash;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-head"><span class="stat-card-icon" style="background:#F5F3FF;color:#7C3AED"><svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5.5" r="2.3" stroke="currentColor" stroke-width="1.2"/><path d="M1.8 13c0-2.2 1.9-3.6 4.2-3.6s4.2 1.4 4.2 3.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M12.3 5v3.4M14 6.7h-3.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span><span class="stat-card-label">New Hires (MTD)</span></div>
+        <div class="stat-card-val" id="ovNewHires-val">&mdash;</div>
+        <div class="stat-card-sub" id="ovNewHires-sub">&mdash;</div>
+      </div>
+    </div>
+    <div class="chart-strip chart-strip-3">
       <div class="chart-panel">
         <div class="chart-panel-head"><span class="chart-panel-label">Compliance rate by item</span></div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:4px">
-          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','tin',doFilter)" id="statTile-tin"><div class="tile-label-row"><span class="tile-icon" style="background:#EEF2FF;color:#4338CA"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><circle cx="5.5" cy="7.5" r="1.3" stroke="currentColor" stroke-width="1.1"/><path d="M3.7 11c.4-1.1 1-1.6 1.8-1.6s1.4.5 1.8 1.6M9.5 6.5h3M9.5 9h2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg></span><div class="kpi-label">TIN</div></div><div class="kpi-val" id="statTileVal-tin">&mdash;</div><div class="tile-sub" id="statTileSub-tin">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-tin" style="width:0%"></div></div><div class="tile-top" id="statTileTop-tin">&mdash;</div></div>
-          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','sss',doFilter)" id="statTile-sss"><div class="tile-label-row"><span class="tile-icon" style="background:#F5F3FF;color:#7C3AED"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5.5 2.2v3.6c0 3.3-2.2 5.9-5.5 7.2-3.3-1.3-5.5-3.9-5.5-7.2V3.7L8 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.7 8l1.6 1.6 3-3.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="kpi-label">SSS</div></div><div class="kpi-val" id="statTileVal-sss">&mdash;</div><div class="tile-sub" id="statTileSub-sss">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-sss" style="width:0%"></div></div><div class="tile-top" id="statTileTop-sss">&mdash;</div></div>
-          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','pag',doFilter)" id="statTile-pag"><div class="tile-label-row"><span class="tile-icon" style="background:#FFF7ED;color:#C2410C"><svg viewBox="0 0 16 16" fill="none"><path d="M2 7.5L8 2l6 5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.3 6.5V13a.8.8 0 00.8.8h7.8a.8.8 0 00.8-.8V6.5" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M6.3 13.8v-3.3h3.4v3.3" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg></span><div class="kpi-label">Pag-IBIG</div></div><div class="kpi-val" id="statTileVal-pag">&mdash;</div><div class="tile-sub" id="statTileSub-pag">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-pag" style="width:0%"></div></div><div class="tile-top" id="statTileTop-pag">&mdash;</div></div>
-          <div class="kpi-item clickable" onclick="kpiFilterClick('f-comp','ph',doFilter)" id="statTile-ph"><div class="tile-label-row"><span class="tile-icon" style="background:#ECFDF5;color:#059669"><svg viewBox="0 0 16 16" fill="none"><path d="M8 13.8s-5.5-3.3-5.5-7.3a3.1 3.1 0 015.5-2 3.1 3.1 0 015.5 2c0 4-5.5 7.3-5.5 7.3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M6 6.5h1.2l.7-1.3.8 2.6.6-1.3H10" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="kpi-label">PhilHealth</div></div><div class="kpi-val" id="statTileVal-ph">&mdash;</div><div class="tile-sub" id="statTileSub-ph">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-ph" style="width:0%"></div></div><div class="tile-top" id="statTileTop-ph">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="switchTab('statutory');kpiFilterClick('f-comp','tin',doFilter)" id="statTile-tin"><div class="tile-label-row"><span class="tile-icon" style="background:#EEF2FF;color:#4338CA"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><circle cx="5.5" cy="7.5" r="1.3" stroke="currentColor" stroke-width="1.1"/><path d="M3.7 11c.4-1.1 1-1.6 1.8-1.6s1.4.5 1.8 1.6M9.5 6.5h3M9.5 9h2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg></span><div class="kpi-label">TIN</div></div><div class="kpi-val" id="statTileVal-tin">&mdash;</div><div class="tile-sub" id="statTileSub-tin">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-tin" style="width:0%"></div></div><div class="tile-top" id="statTileTop-tin">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="switchTab('statutory');kpiFilterClick('f-comp','sss',doFilter)" id="statTile-sss"><div class="tile-label-row"><span class="tile-icon" style="background:#F5F3FF;color:#7C3AED"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5.5 2.2v3.6c0 3.3-2.2 5.9-5.5 7.2-3.3-1.3-5.5-3.9-5.5-7.2V3.7L8 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.7 8l1.6 1.6 3-3.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="kpi-label">SSS</div></div><div class="kpi-val" id="statTileVal-sss">&mdash;</div><div class="tile-sub" id="statTileSub-sss">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-sss" style="width:0%"></div></div><div class="tile-top" id="statTileTop-sss">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="switchTab('statutory');kpiFilterClick('f-comp','pag',doFilter)" id="statTile-pag"><div class="tile-label-row"><span class="tile-icon" style="background:#FFF7ED;color:#C2410C"><svg viewBox="0 0 16 16" fill="none"><path d="M2 7.5L8 2l6 5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.3 6.5V13a.8.8 0 00.8.8h7.8a.8.8 0 00.8-.8V6.5" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M6.3 13.8v-3.3h3.4v3.3" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg></span><div class="kpi-label">Pag-IBIG</div></div><div class="kpi-val" id="statTileVal-pag">&mdash;</div><div class="tile-sub" id="statTileSub-pag">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-pag" style="width:0%"></div></div><div class="tile-top" id="statTileTop-pag">&mdash;</div></div>
+          <div class="kpi-item clickable" onclick="switchTab('statutory');kpiFilterClick('f-comp','ph',doFilter)" id="statTile-ph"><div class="tile-label-row"><span class="tile-icon" style="background:#ECFDF5;color:#059669"><svg viewBox="0 0 16 16" fill="none"><path d="M8 13.8s-5.5-3.3-5.5-7.3a3.1 3.1 0 015.5-2 3.1 3.1 0 015.5 2c0 4-5.5 7.3-5.5 7.3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M6 6.5h1.2l.7-1.3.8 2.6.6-1.3H10" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="kpi-label">PhilHealth</div></div><div class="kpi-val" id="statTileVal-ph">&mdash;</div><div class="tile-sub" id="statTileSub-ph">&mdash;</div><div class="tile-bar-track"><div class="tile-bar-fill" id="statTileBar-ph" style="width:0%"></div></div><div class="tile-top" id="statTileTop-ph">&mdash;</div></div>
         </div>
       </div>
       <div class="chart-panel">
@@ -439,6 +514,35 @@ tbody tr:hover td:first-child{background:#F7F4EC}
           <canvas id="trendChart" role="img" aria-label="Line chart of overall compliance rate by day"></canvas>
         </div>
         <div class="chart-empty" id="trendEmptyState" style="display:none">Trend data starts building from today — check back tomorrow to see it grow.</div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Compliance by site</span><span class="chart-panel-total">highest to lowest</span></div>
+        <div class="lb-list" id="ovSiteLeaderboard"></div>
+      </div>
+    </div>
+    <div class="focus-strip focus-strip-3">
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Needs attention</span></div>
+        <div class="focus-alert">
+          <div class="focus-alert-label">Requirement</div>
+          <div class="focus-alert-name" id="ovFocusReqName">&mdash;</div>
+          <div class="focus-alert-meta"><span class="kpi-val" id="ovFocusReqRate">&mdash;</span></div>
+          <div class="focus-alert-sub" id="ovFocusReqSub">&mdash;</div>
+        </div>
+        <div class="focus-alert">
+          <div class="focus-alert-label">Branch</div>
+          <div class="focus-alert-name" id="ovFocusBranchName">&mdash;</div>
+          <div class="focus-alert-meta"><span class="kpi-val" id="ovFocusBranchRate">&mdash;</span></div>
+          <div class="focus-alert-sub" id="ovFocusBranchSub">&mdash;</div>
+        </div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Top issues today</span></div>
+        <div class="issue-list" id="ovTopIssues"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Department compliance</span><span class="chart-panel-total">highest to lowest</span></div>
+        <div class="lb-list" id="ovDeptLeaderboard"></div>
       </div>
     </div>
   </div>
@@ -450,7 +554,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
   <div id="section-payroll" style="display:none"></div>
 
   <!-- SHARED: toolbar + table + footer (statutory) -->
-  <div id="section-shared">
+  <div id="section-shared" style="display:none">
     <div class="toolbar">
       <div class="search-wrap">
         <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.4"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -1235,6 +1339,7 @@ const BIRTH_TYPES=['Birth Certificate','Photocopy Birth Certificate (3 copies)']
 const EDUC_TYPES=['Proof of Education (Diploma / Certificate of Graduation / TOR)'];
 
 let all=[], filtered=[], page=1, perPage=50, sortKey='', sortDir=1;
+let badgesLoaded={stat:false,req:false,pay:false};
 let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='', reqSortDir=1;
 let payAll=[], payFiltered=[], payPage=1, payPerPage=50, paySortKey='', paySortDir=1;
 let trendChart=null;
@@ -1274,7 +1379,7 @@ async function loadAndRenderTrend(){
   renderTrendChart(rows);
 }
 
-let currentTab='statutory', modalUploadType='statutory';
+let currentTab='overview', modalUploadType='statutory';
 let statDonutChart=null, statBarChart=null, reqDonutChart=null, reqBarChart=null;
 
 /* ── DECOMPRESS ── */
@@ -1416,7 +1521,7 @@ function applyStatutoryData(data){
   })));
   buildFilters();doFilter();
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
-  document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
+  badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
 }
 
 function applyRequirementsData(data){
@@ -1426,7 +1531,7 @@ function applyRequirementsData(data){
     desig:r.designation||'',doj:r.date_of_joining||'',
     peme:r.peme,nbi:r.nbi,job:r.job_contract,birth:r.birth_cert,educ:r.proof_of_educ
   })));
-  document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
+  badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();
   buildReqFilters();reqDoFilter();
 }
 
@@ -1437,7 +1542,7 @@ function applyPayrollData(data){
     branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining,
     l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
   })));
-  document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
+  badgesLoaded.pay=true;updateTabBadges();renderOverviewKPICards();renderOverviewFocus();
   buildPayFilters();payDoFilter();
 }
 
@@ -1462,7 +1567,7 @@ async function init(){
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
-  document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
+  badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
   buildFilters(); buildHead(); buildColumnPicker(); doFilter();
   animateNum(document.getElementById('statDonutRate'));
   initReqs(); initPayroll();
@@ -1480,7 +1585,7 @@ async function init(){
 async function initReqs(){
   const json=await decompress(DOCS_B64);
   reqAll=JSON.parse(json);
-  document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
+  badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();
   document.getElementById('section-requirements').innerHTML=buildReqHTML();
   buildReqFilters(); reqDoFilter();
   animateNum(document.getElementById('reqDonutRate'));
@@ -1490,7 +1595,7 @@ async function initReqs(){
 async function initPayroll(){
   const json=await decompress(PAYROLL_B64);
   payAll=JSON.parse(json);
-  document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
+  badgesLoaded.pay=true;updateTabBadges();renderOverviewKPICards();renderOverviewFocus();
   document.getElementById('section-payroll').innerHTML=buildPayHTML();
   buildPayFilters(); payDoFilter();
   animateKpiStrip('pay-kpi-strip');
@@ -1498,16 +1603,256 @@ async function initPayroll(){
 
 }
 
+/* ── TAB BADGES (compliance %) ── */
+function updateTabBadges(){
+  const setBadge=(id,rate)=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.textContent=rate+'%';
+    el.classList.toggle('tab-badge-warn',rate<90);
+  };
+  if(badgesLoaded.stat&&all.length){
+    const okStat=all.filter(r=>r.tin!=='X'&&r.sss!=='X'&&r.pag!=='X'&&r.ph!=='X').length;
+    setBadge('tab-cnt-statutory',Math.round(okStat/all.length*100));
+  }
+  if(badgesLoaded.req&&reqAll.length){
+    const okReq=reqAll.filter(r=>r.peme!=='X'&&r.nbi!=='X'&&r.job!=='X'&&r.birth!=='X'&&r.educ!=='X').length;
+    setBadge('tab-cnt-requirements',Math.round(okReq/reqAll.length*100));
+  }
+  if(badgesLoaded.pay&&badgesLoaded.stat&&all.length){
+    setBadge('tab-cnt-payroll',Math.round((all.length-payAll.length)/all.length*100));
+  }
+}
+
+/* ── OVERVIEW: FOCUS AREAS ── */
+function renderOverviewFocus(){
+  if(!all.length)return;
+  const rateClass=r=>r>=90?'c-ok':r>=80?'c-warn':'c-bad';
+
+  // Requirement needing the most attention (lowest compliance rate)
+  const reqDefs=[{key:'tin',label:'TIN'},{key:'sss',label:'SSS'},{key:'pag',label:'Pag-IBIG'},{key:'ph',label:'PhilHealth'}];
+  let worstReq=null;
+  reqDefs.forEach(rd=>{
+    const missing=all.filter(r=>r[rd.key]==='X').length;
+    const rate=all.length?((all.length-missing)/all.length*100):0;
+    if(!worstReq||rate<worstReq.rate)worstReq={...rd,rate,missing};
+  });
+  if(worstReq){
+    const rn=document.getElementById('ovFocusReqName');if(rn)rn.textContent=worstReq.label;
+    const rr=document.getElementById('ovFocusReqRate');
+    if(rr){rr.textContent=worstReq.rate.toFixed(1)+'%';rr.className='kpi-val '+rateClass(worstReq.rate);}
+    const rs=document.getElementById('ovFocusReqSub');if(rs)rs.textContent=worstReq.missing.toLocaleString()+' employees missing';
+  }
+
+  // Branch needing the most focus (lowest rate, min 5 employees to avoid noise from tiny branches)
+  const branchStats={};
+  all.forEach(r=>{
+    const b=r.branch||'(No branch)';
+    if(!branchStats[b])branchStats[b]={total:0,missing:0};
+    branchStats[b].total++;
+    if(r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X')branchStats[b].missing++;
+  });
+  let worstBranch=null;
+  Object.keys(branchStats).forEach(b=>{
+    const s=branchStats[b];if(s.total<5)return;
+    const rate=(s.total-s.missing)/s.total*100;
+    if(!worstBranch||rate<worstBranch.rate)worstBranch={name:b,rate,missing:s.missing,total:s.total};
+  });
+  if(worstBranch){
+    const bn=document.getElementById('ovFocusBranchName');if(bn)bn.textContent=worstBranch.name;
+    const br=document.getElementById('ovFocusBranchRate');
+    if(br){br.textContent=worstBranch.rate.toFixed(1)+'%';br.className='kpi-val '+rateClass(worstBranch.rate);}
+    const bs=document.getElementById('ovFocusBranchSub');if(bs)bs.textContent=worstBranch.missing.toLocaleString()+' of '+worstBranch.total.toLocaleString()+' missing something';
+  }
+
+  // Compliance by site leaderboard, highest to lowest (reuses branchStats above)
+  const siteList=Object.keys(branchStats).map(b=>{
+    const s=branchStats[b];
+    return{name:b,rate:s.total?(s.total-s.missing)/s.total*100:0,total:s.total};
+  }).sort((a,b)=>b.rate-a.rate);
+  const siteLb=document.getElementById('ovSiteLeaderboard');
+  if(siteLb){
+    siteLb.innerHTML=siteList.map(s=>{
+      const color=s.rate>=90?'#16A34A':s.rate>=80?'#F59E0B':'#EF4444';
+      return `<div class="lb-row" title="${esc(s.name)}: ${s.total.toLocaleString()} employees">`+
+        `<span class="lb-name">${esc(s.name)}</span>`+
+        `<div class="lb-bar-track"><div class="lb-bar-fill" style="width:${s.rate.toFixed(1)}%;background:${color}"></div></div>`+
+        `<span class="lb-rate">${s.rate.toFixed(0)}%</span></div>`;
+    }).join('');
+  }
+
+  // Top issues today: the single worst branch for each issue category, so the list stays
+  // diverse instead of being dominated by whichever category has the largest raw numbers
+  const issues=[];
+  const branchMissingByItem={};
+  all.forEach(r=>{
+    const b=r.branch||'(No branch)';
+    if(!branchMissingByItem[b])branchMissingByItem[b]={tin:0,sss:0,pag:0,ph:0};
+    if(r.tin==='X')branchMissingByItem[b].tin++;
+    if(r.sss==='X')branchMissingByItem[b].sss++;
+    if(r.pag==='X')branchMissingByItem[b].pag++;
+    if(r.ph==='X')branchMissingByItem[b].ph++;
+  });
+  const itemLabels={tin:'TIN',sss:'SSS',pag:'Pag-IBIG',ph:'PhilHealth'};
+  Object.keys(itemLabels).forEach(k=>{
+    let top=null,topCount=0;
+    Object.keys(branchMissingByItem).forEach(b=>{
+      const c=branchMissingByItem[b][k];
+      if(c>topCount){top=b;topCount=c;}
+    });
+    if(top)issues.push({branch:top,label:'Missing '+itemLabels[k],count:topCount});
+  });
+  const payByBranch={};
+  payAll.forEach(r=>{const b=r.branch||'(No branch)';payByBranch[b]=(payByBranch[b]||0)+1;});
+  let topPay=null,topPayCount=0;
+  Object.keys(payByBranch).forEach(b=>{if(payByBranch[b]>topPayCount){topPay=b;topPayCount=payByBranch[b];}});
+  if(topPay)issues.push({branch:topPay,label:'Missing Payroll',count:topPayCount});
+  const reqByBranch={};
+  reqAll.forEach(r=>{
+    if(r.peme==='X'||r.nbi==='X'||r.job==='X'||r.birth==='X'||r.educ==='X'){
+      const b=r.branch||'(No branch)';reqByBranch[b]=(reqByBranch[b]||0)+1;
+    }
+  });
+  let topReq=null,topReqCount=0;
+  Object.keys(reqByBranch).forEach(b=>{if(reqByBranch[b]>topReqCount){topReq=b;topReqCount=reqByBranch[b];}});
+  if(topReq)issues.push({branch:topReq,label:'Missing Requirements',count:topReqCount});
+  issues.sort((a,b)=>b.count-a.count);
+  const issuesEl=document.getElementById('ovTopIssues');
+  if(issuesEl){
+    if(!issues.length){
+      issuesEl.innerHTML='<div class="issue-empty">No outstanding issues right now.</div>';
+    }else{
+      issuesEl.innerHTML=issues.map(i=>
+        `<div class="issue-row">`+
+          `<span class="issue-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8l6.5 11.4a1 1 0 01-.9 1.5H2.4a1 1 0 01-.9-1.5L8 1.8z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6.3v3M8 11.3h.007" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>`+
+          `<div class="issue-text"><div class="issue-branch">${esc(i.branch)}</div><div class="issue-detail">${esc(i.label)}</div></div>`+
+          `<span class="issue-count">${i.count.toLocaleString()}</span>`+
+        `</div>`
+      ).join('');
+    }
+  }
+
+  // Department compliance leaderboard, highest to lowest
+  const deptStats={};
+  all.forEach(r=>{
+    const d=r.dept||'(No department)';
+    if(!deptStats[d])deptStats[d]={total:0,missing:0};
+    deptStats[d].total++;
+    if(r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X')deptStats[d].missing++;
+  });
+  const deptList=Object.keys(deptStats).map(d=>{
+    const s=deptStats[d];
+    return{name:d,rate:s.total?(s.total-s.missing)/s.total*100:0,total:s.total};
+  }).sort((a,b)=>b.rate-a.rate);
+  const lb=document.getElementById('ovDeptLeaderboard');
+  if(lb){
+    lb.innerHTML=deptList.map(d=>{
+      const color=d.rate>=90?'#16A34A':d.rate>=80?'#F59E0B':'#EF4444';
+      return `<div class="lb-row" title="${esc(d.name)}: ${d.total.toLocaleString()} employees">`+
+        `<span class="lb-name">${esc(d.name)}</span>`+
+        `<div class="lb-bar-track"><div class="lb-bar-fill" style="width:${d.rate.toFixed(1)}%;background:${color}"></div></div>`+
+        `<span class="lb-rate">${d.rate.toFixed(0)}%</span></div>`;
+    }).join('');
+  }
+}
+
+/* ── OVERVIEW: 5-CARD KPI ROW + ITEM TILES (all unfiltered, true overall stats) ── */
+function setStatCard(prefix,value,sub){
+  const v=document.getElementById(prefix+'-val');if(v)v.textContent=value;
+  const s=document.getElementById(prefix+'-sub');if(s)s.textContent=sub;
+}
+function renderOverviewKPICards(){
+  if(!all.length)return;
+  const t=all.length;
+  const tm=all.filter(r=>r.tin==='X').length;
+  const sm=all.filter(r=>r.sss==='X').length;
+  const pm=all.filter(r=>r.pag==='X').length;
+  const hm=all.filter(r=>r.ph==='X').length;
+  const any=all.filter(r=>r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X').length;
+  const ok=t-any;const rate=t?Math.round(ok/t*100):0;
+
+  // Card 1: Overall Compliance donut
+  const rateEl=document.getElementById('ovDonutRate');if(rateEl)rateEl.textContent=rate+'%';
+  const legendEl=document.getElementById('ovDonutLegend');
+  if(legendEl)legendEl.innerHTML=
+    '<div class="stat-card-legend-row"><i style="background:#16A34A"></i>Compliant <strong>'+ok.toLocaleString()+'</strong><em>'+(t?(ok/t*100).toFixed(1):'0')+'%</em></div>'+
+    '<div class="stat-card-legend-row"><i style="background:#EF4444"></i>Missing <strong>'+any.toLocaleString()+'</strong><em>'+(t?(any/t*100).toFixed(1):'0')+'%</em></div>';
+  if(document.getElementById('ovDonut')){
+    if(!statDonutChart){
+      statDonutChart=new Chart(document.getElementById('ovDonut'),{
+        type:'doughnut',
+        data:{labels:['Fully compliant','Has missing'],datasets:[{data:[ok,any],backgroundColor:['#16A34A','#EF4444'],borderColor:'#fff',borderWidth:2}]},
+        options:{responsive:true,maintainAspectRatio:false,cutout:'70%',
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.raw.toLocaleString()}}},
+          onClick:(e,els)=>{if(!els.length)return;switchTab('statutory');kpiFilterClick('f-comp',['complete','missing'][els[0].index],doFilter);}
+        }
+      });
+    }else{
+      statDonutChart.data.datasets[0].data=[ok,any];
+      statDonutChart.update();
+    }
+  }
+
+  // Per-item tiles (TIN/SSS/Pag-IBIG/PhilHealth) — always the true overall rate
+  const topBranchFor=(key)=>{
+    const counts={};
+    all.forEach(r=>{if(r[key]==='X'){const b=r.branch||'(No branch)';counts[b]=(counts[b]||0)+1;}});
+    let top=null,topCount=0;
+    for(const b in counts){if(counts[b]>topCount){top=b;topCount=counts[b];}}
+    return top?{branch:top,count:topCount}:null;
+  };
+  const setTile=(key,rate,missCount)=>{
+    const val=document.getElementById('statTileVal-'+key);
+    const sub=document.getElementById('statTileSub-'+key);
+    const bar=document.getElementById('statTileBar-'+key);
+    const top=document.getElementById('statTileTop-'+key);
+    if(!val)return;
+    const colorClass=rate>=90?'c-ok':rate>=80?'c-warn':'c-bad';
+    const barColor=rate>=90?'#16A34A':rate>=80?'#F59E0B':'#EF4444';
+    val.textContent=rate.toFixed(1)+'%';
+    val.className='kpi-val '+colorClass;
+    if(sub)sub.textContent=missCount.toLocaleString()+' missing';
+    if(bar){bar.style.width=rate.toFixed(1)+'%';bar.style.background=barColor;}
+    if(top){
+      const t2=topBranchFor(key);
+      top.innerHTML=t2?('Most missing in: <strong>'+esc(t2.branch)+'</strong> ('+t2.count.toLocaleString()+')'):'No gaps to flag';
+    }
+  };
+  setTile('tin',t?((t-tm)/t*100):0,tm);
+  setTile('sss',t?((t-sm)/t*100):0,sm);
+  setTile('pag',t?((t-pm)/t*100):0,pm);
+  setTile('ph',t?((t-hm)/t*100):0,hm);
+
+  // Card 2: Total Employees (active only)
+  const activeCount=all.filter(r=>r.estat==='Active').length;
+  setStatCard('ovTotalEmp',activeCount.toLocaleString(),'Active records');
+
+  // Card 3: Need Action
+  setStatCard('ovNeedAction',any.toLocaleString(),'Employees with a gap');
+
+  // Card 4: Payroll Incomplete
+  setStatCard('ovPayrollIncomplete',payAll.length.toLocaleString(),'Missing bank details');
+
+  // Card 5: New Hires (MTD)
+  const now=new Date();
+  const mtd=all.filter(r=>{
+    if(!r.doj)return false;
+    const d=new Date(r.doj);
+    return !isNaN(d.getTime())&&d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
+  }).length;
+  setStatCard('ovNewHires',mtd.toLocaleString(),'This month');
+}
+
 /* ── TAB SWITCHING ── */
 function switchTab(tab){
   currentTab=tab;
-  ['statutory','requirements','payroll'].forEach(t=>{
+  ['overview','statutory','requirements','payroll'].forEach(t=>{
     document.getElementById('tab-btn-'+t).classList.toggle('active',t===tab);
   });
-  document.getElementById('stat-kpi-wrap').style.display=tab==='statutory'?'':'none';
+  document.getElementById('section-overview').style.display=tab==='overview'?'':'none';
   document.getElementById('section-requirements').style.display=tab==='requirements'?'':'none';
   document.getElementById('section-payroll').style.display=tab==='payroll'?'':'none';
   document.getElementById('section-shared').style.display=tab==='statutory'?'':'none';
+  if(tab==='overview'){renderOverviewFocus();renderOverviewKPICards();}
 }
 
 function toggleSidebar(){
@@ -1663,7 +2008,7 @@ function processFile(buffer,status){
       all=processed;
       window._lastUploadedBankMap=bankRecords;
       document.getElementById('hdr-count').textContent=all.length.toLocaleString();
-      document.getElementById('tab-cnt-statutory').textContent=all.length.toLocaleString();
+      badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
       buildFilters();doFilter();setAsOfDate(new Date());
       status.textContent='\u2713 Loaded '+all.length.toLocaleString()+' employees. Saving to database\u2026';
       const statRecords=all.map(r=>({
@@ -1689,7 +2034,7 @@ function processFile(buffer,status){
           branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,doj:r.date_of_joining,
           l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
         }));
-        document.getElementById('tab-cnt-payroll').textContent=payAll.length.toLocaleString();
+        badgesLoaded.pay=true;updateTabBadges();renderOverviewKPICards();renderOverviewFocus();
         buildPayFilters();payDoFilter();
         if(statOk)maybeSaveTrendSnapshot().then(()=>loadAndRenderTrend());
         status.className='upload-status ok';
@@ -1757,7 +2102,7 @@ function processReqFile(buffer,status){
         job:jobSet.has(e.id)?'Y':'X',birth:birthSet.has(e.id)?'Y':'X',educ:educSet.has(e.id)?'Y':'X'
       })));
       reqAll=records;
-      document.getElementById('tab-cnt-requirements').textContent=reqAll.length.toLocaleString();
+      badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();
       buildReqFilters();reqDoFilter();setAsOfDate(new Date());
       status.textContent='✓ Loaded '+records.length.toLocaleString()+' employees. Saving to database…';
       const reqRecords=records.map(r=>(({
@@ -1877,76 +2222,6 @@ function doFilter(){
 
 function updateKPIs(){
   const t=filtered.length;
-  const tm=filtered.filter(r=>r.tin==='X').length;
-  const sm=filtered.filter(r=>r.sss==='X').length;
-  const pm=filtered.filter(r=>r.pag==='X').length;
-  const hm=filtered.filter(r=>r.ph==='X').length;
-  const any=filtered.filter(r=>r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X').length;
-  const ok=t-any;const rate=t?Math.round(ok/t*100):0;
-  const curComp=document.getElementById('f-comp')?.value||'';
-
-  document.getElementById('statChartTotal').textContent=t.toLocaleString()+' employees';
-  document.getElementById('statDonutRate').textContent=rate+'%';
-  document.getElementById('statDonutLegend').innerHTML=
-    '<span><i style="background:#16A34A"></i>Compliant '+ok.toLocaleString()+'</span>'+
-    '<span><i style="background:#EF4444"></i>Missing '+any.toLocaleString()+'</span>';
-
-  const donutKeys=['complete','missing'];
-  const donutSel=donutKeys.includes(curComp);
-  const donutColors=['#16A34A','#EF4444'].map((c,i)=>(!donutSel||donutKeys[i]===curComp)?c:c+'55');
-
-  if(!statDonutChart){
-    statDonutChart=new Chart(document.getElementById('statDonut'),{
-      type:'doughnut',
-      data:{labels:['Fully compliant','Has missing'],datasets:[{data:[ok,any],backgroundColor:donutColors,borderColor:'#fff',borderWidth:2}]},
-      options:{responsive:true,maintainAspectRatio:false,cutout:'70%',
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.raw.toLocaleString()}}},
-        onClick:(e,els)=>{if(!els.length)return;kpiFilterClick('f-comp',donutKeys[els[0].index],doFilter);}
-      }
-    });
-  }else{
-    statDonutChart.data.datasets[0].data=[ok,any];
-    statDonutChart.data.datasets[0].backgroundColor=donutColors;
-    statDonutChart.update();
-  }
-
-  const tinRate=t?((t-tm)/t*100):0;
-  const sssRate=t?((t-sm)/t*100):0;
-  const pagRate=t?((t-pm)/t*100):0;
-  const phRate=t?((t-hm)/t*100):0;
-
-  const topBranchFor=(key)=>{
-    const counts={};
-    filtered.forEach(r=>{if(r[key]==='X'){const b=r.branch||'(No branch)';counts[b]=(counts[b]||0)+1;}});
-    let top=null,topCount=0;
-    for(const b in counts){if(counts[b]>topCount){top=b;topCount=counts[b];}}
-    return top?{branch:top,count:topCount}:null;
-  };
-
-  const setTile=(key,rate,missCount)=>{
-    const val=document.getElementById('statTileVal-'+key);
-    const tile=document.getElementById('statTile-'+key);
-    const sub=document.getElementById('statTileSub-'+key);
-    const bar=document.getElementById('statTileBar-'+key);
-    const top=document.getElementById('statTileTop-'+key);
-    if(!val||!tile)return;
-    const colorClass=rate>=90?'c-ok':rate>=80?'c-warn':'c-bad';
-    const barColor=rate>=90?'#16A34A':rate>=80?'#F59E0B':'#EF4444';
-    val.textContent=rate.toFixed(1)+'%';
-    val.className='kpi-val '+colorClass;
-    tile.classList.toggle('kpi-active',curComp===key);
-    if(sub)sub.textContent=missCount.toLocaleString()+' missing';
-    if(bar){bar.style.width=rate.toFixed(1)+'%';bar.style.background=barColor;}
-    if(top){
-      const t2=topBranchFor(key);
-      top.innerHTML=t2?('Most missing in: <strong>'+esc(t2.branch)+'</strong> ('+t2.count.toLocaleString()+')'):'No gaps to flag';
-    }
-  };
-  setTile('tin',tinRate,tm);
-  setTile('sss',sssRate,sm);
-  setTile('pag',pagRate,pm);
-  setTile('ph',phRate,hm);
-
   document.getElementById('count-pill').textContent=t.toLocaleString()+' records';
 }
 
@@ -2373,7 +2648,6 @@ function payUpdateKPIs(){
   const t=payFiltered.length;
   const el=document.getElementById('pk-total');if(el)el.textContent=t.toLocaleString();
   const cp=document.getElementById('pay-count-pill');if(cp)cp.textContent=t.toLocaleString()+' records';
-  const pc=document.getElementById('tab-cnt-payroll');if(pc)pc.textContent=payAll.length.toLocaleString();
 }
 
 function payRender(){
