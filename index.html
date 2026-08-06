@@ -221,6 +221,8 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 /* OVERVIEW: 5-CARD KPI ROW */
 .kpi5-strip{display:grid;grid-template-columns:1.7fr 1fr 1fr 1fr 1fr;gap:16px;padding:20px 24px 0;background:transparent}
 .stat-card{padding:16px 18px;border:1px solid var(--rule-light);border-radius:14px;background:var(--surface);box-shadow:0 1px 2px rgba(15,23,42,.05),0 2px 6px rgba(15,23,42,.04)}
+.stat-card.clickable{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.stat-card.clickable:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(67,56,202,.12)}
 .stat-card-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .stat-card-icon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .stat-card-icon svg{width:14px;height:14px}
@@ -252,6 +254,8 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 .lb-bar-track{flex:1;height:7px;background:var(--rule-light);border-radius:4px;overflow:hidden}
 .lb-bar-fill{height:100%;border-radius:4px;transition:width .3s ease}
 .lb-rate{font-size:12px;font-weight:600;color:var(--ink);width:38px;text-align:right;flex-shrink:0}
+.lb-row.clickable,.focus-alert.clickable,.issue-row.clickable{cursor:pointer;transition:background .12s;border-radius:8px;margin:0 -8px;padding-left:8px;padding-right:8px}
+.lb-row.clickable:hover,.focus-alert.clickable:hover,.issue-row.clickable:hover{background:var(--canvas)}
 .focus-strip-3{grid-template-columns:0.8fr 1fr 1.2fr}
 .issue-list{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 .issue-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--rule-light)}
@@ -478,23 +482,23 @@ tbody tr:hover td:first-child{background:#F7F4EC}
           <div class="stat-card-legend" id="ovDonutLegend"></div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card clickable" onclick="goFilter('statutory',{'f-estat':'Active'})" title="View active employees">
         <div class="stat-card-head"><span class="stat-card-icon" style="background:#EEF2FF;color:#4338CA"><svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.3" stroke="currentColor" stroke-width="1.2"/><path d="M2 13c0-2.2 1.8-3.6 4-3.6s4 1.4 4 3.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M10.5 3.2c1 .2 1.8 1 1.8 2.1s-.8 1.9-1.8 2.1M12 9.6c1.6.3 2.5 1.3 2.5 2.7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg></span><span class="stat-card-label">Total Employees</span></div>
         <div class="stat-card-val" id="ovTotalEmp-val">&mdash;</div>
         <div class="stat-card-sub" id="ovTotalEmp-sub">&mdash;</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card clickable" onclick="goFilter('statutory',{'f-comp':'missing'})" title="View employees with a gap">
         <div class="stat-card-head"><span class="stat-card-icon" style="background:#FEE2E2;color:#DC2626"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8l6.5 11.4a1 1 0 01-.9 1.5H2.4a1 1 0 01-.9-1.5L8 1.8z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6.3v3M8 11.3h.007" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span class="stat-card-label">Need Action</span></div>
         <div class="stat-card-val" id="ovNeedAction-val">&mdash;</div>
         <div class="stat-card-sub" id="ovNeedAction-sub">&mdash;</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card clickable" onclick="switchTab('payroll')" title="View employees missing payroll bank details">
         <div class="stat-card-head"><span class="stat-card-icon" style="background:#FFF7ED;color:#C2410C"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 6.8h13" stroke="currentColor" stroke-width="1.2"/><path d="M4 10h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span><span class="stat-card-label">Payroll Incomplete</span></div>
         <div class="stat-card-val" id="ovPayrollIncomplete-val">&mdash;</div>
         <div class="stat-card-sub" id="ovPayrollIncomplete-sub">&mdash;</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-card-head"><span class="stat-card-icon" style="background:#F5F3FF;color:#7C3AED"><svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5.5" r="2.3" stroke="currentColor" stroke-width="1.2"/><path d="M1.8 13c0-2.2 1.9-3.6 4.2-3.6s4.2 1.4 4.2 3.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M12.3 5v3.4M14 6.7h-3.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span><span class="stat-card-label">New Hires (MTD)</span></div>
+      <div class="stat-card clickable" onclick="goFilter('statutory',{'f-comp':'newhire'})" title="View employees hired in the last 30 days">
+        <div class="stat-card-head"><span class="stat-card-icon" style="background:#F5F3FF;color:#7C3AED"><svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5.5" r="2.3" stroke="currentColor" stroke-width="1.2"/><path d="M1.8 13c0-2.2 1.9-3.6 4.2-3.6s4.2 1.4 4.2 3.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M12.3 5v3.4M14 6.7h-3.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span><span class="stat-card-label">New Hires (&le;30 Days)</span></div>
         <div class="stat-card-val" id="ovNewHires-val">&mdash;</div>
         <div class="stat-card-sub" id="ovNewHires-sub">&mdash;</div>
       </div>
@@ -524,13 +528,13 @@ tbody tr:hover td:first-child{background:#F7F4EC}
     <div class="focus-strip focus-strip-3">
       <div class="chart-panel">
         <div class="chart-panel-head"><span class="chart-panel-label">Needs attention</span></div>
-        <div class="focus-alert">
+        <div class="focus-alert clickable" id="ovFocusReqAlert" title="View these employees">
           <div class="focus-alert-label">Requirement</div>
           <div class="focus-alert-name" id="ovFocusReqName">&mdash;</div>
           <div class="focus-alert-meta"><span class="kpi-val" id="ovFocusReqRate">&mdash;</span></div>
           <div class="focus-alert-sub" id="ovFocusReqSub">&mdash;</div>
         </div>
-        <div class="focus-alert">
+        <div class="focus-alert clickable" id="ovFocusBranchAlert" title="View these employees">
           <div class="focus-alert-label">Branch</div>
           <div class="focus-alert-name" id="ovFocusBranchName">&mdash;</div>
           <div class="focus-alert-meta"><span class="kpi-val" id="ovFocusBranchRate">&mdash;</span></div>
@@ -567,6 +571,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
       <select class="filter-sel" id="f-dept"   onchange="doFilter()"><option value="">All departments</option></select>
       <select class="filter-sel" id="f-branch" onchange="doFilter()"><option value="">All branches</option></select>
       <select class="filter-sel" id="f-etype"  onchange="doFilter()"><option value="">All emp. types</option></select>
+      <select class="filter-sel" id="f-estat"  onchange="doFilter()"><option value="">All statuses</option></select>
       <select class="filter-sel" id="f-comp"   onchange="doFilter()">
         <option value="">All compliance</option>
         <option value="missing">Has missing (&#10007;)</option>
@@ -575,6 +580,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <option value="sss">SSS missing</option>
         <option value="pag">Pag-IBIG missing</option>
         <option value="ph">PhilHealth missing</option>
+        <option value="newhire">New hires (&le;30 days)</option>
       </select>
       <select class="filter-sel" id="f-compstatus" onchange="doFilter()">
         <option value="">All statuses</option>
@@ -1644,6 +1650,7 @@ function renderOverviewFocus(){
     const rr=document.getElementById('ovFocusReqRate');
     if(rr){rr.textContent=worstReq.rate.toFixed(1)+'%';rr.className='kpi-val '+rateClass(worstReq.rate);}
     const rs=document.getElementById('ovFocusReqSub');if(rs)rs.textContent=worstReq.missing.toLocaleString()+' employees missing';
+    const ra=document.getElementById('ovFocusReqAlert');if(ra)ra.onclick=()=>goFilter('statutory',{'f-comp':worstReq.key});
   }
 
   // Branch needing the most focus (lowest rate, min 5 employees to avoid noise from tiny branches)
@@ -1665,6 +1672,7 @@ function renderOverviewFocus(){
     const br=document.getElementById('ovFocusBranchRate');
     if(br){br.textContent=worstBranch.rate.toFixed(1)+'%';br.className='kpi-val '+rateClass(worstBranch.rate);}
     const bs=document.getElementById('ovFocusBranchSub');if(bs)bs.textContent=worstBranch.missing.toLocaleString()+' of '+worstBranch.total.toLocaleString()+' missing something';
+    const ba=document.getElementById('ovFocusBranchAlert');if(ba)ba.onclick=()=>goFilter('statutory',{'f-branch':worstBranch.name});
   }
 
   // Compliance by site leaderboard, highest to lowest (reuses branchStats above)
@@ -1676,7 +1684,7 @@ function renderOverviewFocus(){
   if(siteLb){
     siteLb.innerHTML=siteList.map(s=>{
       const color=s.rate>=90?'#16A34A':s.rate>=80?'#F59E0B':'#EF4444';
-      return `<div class="lb-row" title="${esc(s.name)}: ${s.total.toLocaleString()} employees">`+
+      return `<div class="lb-row clickable" title="${esc(s.name)}: ${s.total.toLocaleString()} employees &mdash; click to view" onclick="goFilter('statutory',{'f-branch':'${jsAttr(s.name)}'})">`+
         `<span class="lb-name">${esc(s.name)}</span>`+
         `<div class="lb-bar-track"><div class="lb-bar-fill" style="width:${s.rate.toFixed(1)}%;background:${color}"></div></div>`+
         `<span class="lb-rate">${s.rate.toFixed(0)}%</span></div>`;
@@ -1702,13 +1710,13 @@ function renderOverviewFocus(){
       const c=branchMissingByItem[b][k];
       if(c>topCount){top=b;topCount=c;}
     });
-    if(top)issues.push({branch:top,label:'Missing '+itemLabels[k],count:topCount});
+    if(top)issues.push({branch:top,label:'Missing '+itemLabels[k],count:topCount,tab:'statutory',sets:{'f-comp':k,'f-branch':top}});
   });
   const payByBranch={};
   payAll.forEach(r=>{const b=r.branch||'(No branch)';payByBranch[b]=(payByBranch[b]||0)+1;});
   let topPay=null,topPayCount=0;
   Object.keys(payByBranch).forEach(b=>{if(payByBranch[b]>topPayCount){topPay=b;topPayCount=payByBranch[b];}});
-  if(topPay)issues.push({branch:topPay,label:'Missing Payroll',count:topPayCount});
+  if(topPay)issues.push({branch:topPay,label:'Missing Payroll',count:topPayCount,tab:'payroll',sets:{'pf-branch':topPay}});
   const reqByBranch={};
   reqAll.forEach(r=>{
     if(r.peme==='X'||r.nbi==='X'||r.job==='X'||r.birth==='X'||r.educ==='X'){
@@ -1717,20 +1725,20 @@ function renderOverviewFocus(){
   });
   let topReq=null,topReqCount=0;
   Object.keys(reqByBranch).forEach(b=>{if(reqByBranch[b]>topReqCount){topReq=b;topReqCount=reqByBranch[b];}});
-  if(topReq)issues.push({branch:topReq,label:'Missing Requirements',count:topReqCount});
+  if(topReq)issues.push({branch:topReq,label:'Missing Requirements',count:topReqCount,tab:'requirements',sets:{'rf-comp':'missing','rf-branch':topReq}});
   issues.sort((a,b)=>b.count-a.count);
   const issuesEl=document.getElementById('ovTopIssues');
   if(issuesEl){
     if(!issues.length){
       issuesEl.innerHTML='<div class="issue-empty">No outstanding issues right now.</div>';
     }else{
-      issuesEl.innerHTML=issues.map(i=>
-        `<div class="issue-row">`+
+      issuesEl.innerHTML=issues.map(i=>{
+        return `<div class="issue-row clickable" title="Click to view these employees" onclick="goFilter('${i.tab}',${esc(JSON.stringify(i.sets))})">`+
           `<span class="issue-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8l6.5 11.4a1 1 0 01-.9 1.5H2.4a1 1 0 01-.9-1.5L8 1.8z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6.3v3M8 11.3h.007" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>`+
           `<div class="issue-text"><div class="issue-branch">${esc(i.branch)}</div><div class="issue-detail">${esc(i.label)}</div></div>`+
           `<span class="issue-count">${i.count.toLocaleString()}</span>`+
-        `</div>`
-      ).join('');
+        `</div>`;
+      }).join('');
     }
   }
 
@@ -1750,7 +1758,7 @@ function renderOverviewFocus(){
   if(lb){
     lb.innerHTML=deptList.map(d=>{
       const color=d.rate>=90?'#16A34A':d.rate>=80?'#F59E0B':'#EF4444';
-      return `<div class="lb-row" title="${esc(d.name)}: ${d.total.toLocaleString()} employees">`+
+      return `<div class="lb-row clickable" title="${esc(d.name)}: ${d.total.toLocaleString()} employees &mdash; click to view" onclick="goFilter('statutory',{'f-dept':'${jsAttr(d.name)}'})">`+
         `<span class="lb-name">${esc(d.name)}</span>`+
         `<div class="lb-bar-track"><div class="lb-bar-fill" style="width:${d.rate.toFixed(1)}%;background:${color}"></div></div>`+
         `<span class="lb-rate">${d.rate.toFixed(0)}%</span></div>`;
@@ -1835,14 +1843,17 @@ function renderOverviewKPICards(){
   // Card 4: Payroll Incomplete
   setStatCard('ovPayrollIncomplete',payAll.length.toLocaleString(),'Missing bank details');
 
-  // Card 5: New Hires (MTD)
+  // Card 5: New Hires (tenure <= 30 days)
   const now=new Date();
-  const mtd=all.filter(r=>{
+  const msIn30Days=30*24*60*60*1000;
+  const newHires=all.filter(r=>{
     if(!r.doj)return false;
     const d=new Date(r.doj);
-    return !isNaN(d.getTime())&&d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
+    if(isNaN(d.getTime()))return false;
+    const tenureMs=now-d;
+    return tenureMs>=0&&tenureMs<=msIn30Days;
   }).length;
-  setStatCard('ovNewHires',mtd.toLocaleString(),'This month');
+  setStatCard('ovNewHires',newHires.toLocaleString(),'Tenure of 30 days or less');
 }
 
 /* ── TAB SWITCHING ── */
@@ -2127,10 +2138,11 @@ function processReqFile(buffer,status){
 
 /* ── FILTERS ── */
 function buildFilters(){
-  const s={entity:new Set,dept:new Set,branch:new Set,etype:new Set};
+  const s={entity:new Set,dept:new Set,branch:new Set,etype:new Set,estat:new Set};
   all.forEach(r=>{
     if(r.entity)s.entity.add(r.entity);if(r.dept)s.dept.add(r.dept);
     if(r.branch)s.branch.add(r.branch);if(r.etype)s.etype.add(r.etype);
+    if(r.estat)s.estat.add(r.estat);
   });
   const fill=(id,set,ph)=>{
     const el=document.getElementById(id);
@@ -2139,6 +2151,7 @@ function buildFilters(){
   };
   fill('f-entity',s.entity,'All entities');fill('f-dept',s.dept,'All departments');
   fill('f-branch',s.branch,'All branches');fill('f-etype',s.etype,'All emp. types');
+  fill('f-estat',s.estat,'All statuses');
 }
 
 function buildColumnPicker(){
@@ -2193,7 +2206,7 @@ function sortBy(k,thEl){
 
 function clearStatFilters(){
   document.getElementById('q').value='';
-  ['f-entity','f-dept','f-branch','f-etype','f-comp','f-compstatus'].forEach(id=>{
+  ['f-entity','f-dept','f-branch','f-etype','f-estat','f-comp','f-compstatus'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.value='';
   });
@@ -2206,16 +2219,24 @@ function doFilter(){
   const fd=document.getElementById('f-dept').value;
   const fb=document.getElementById('f-branch').value;
   const ft=document.getElementById('f-etype').value;
+  const fes=document.getElementById('f-estat').value;
   const fc=document.getElementById('f-comp').value;
   const fcs=document.getElementById('f-compstatus').value;
   filtered=all.filter(r=>{
     if(q&&!(r.id+' '+r.name+' '+r.desig).toLowerCase().includes(q))return false;
     if(fe&&r.entity!==fe)return false;if(fd&&r.dept!==fd)return false;
     if(fb&&r.branch!==fb)return false;if(ft&&r.etype!==ft)return false;
+    if(fes&&r.estat!==fes)return false;
     if(fc==='missing'&&r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')return false;
     if(fc==='complete'&&(r.tin==='X'||r.sss==='X'||r.pag==='X'||r.ph==='X'))return false;
     if(fc==='tin'&&r.tin!=='X')return false;if(fc==='sss'&&r.sss!=='X')return false;
     if(fc==='pag'&&r.pag!=='X')return false;if(fc==='ph'&&r.ph!=='X')return false;
+    if(fc==='newhire'){
+      const d=new Date(r.doj);
+      if(isNaN(d.getTime()))return false;
+      const tenureMs=Date.now()-d.getTime();
+      if(tenureMs<0||tenureMs>30*24*60*60*1000)return false;
+    }
     if(fcs){const ok=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';
       if(fcs==='COMPLETE'&&!ok)return false;if(fcs==='INCOMPLETE'&&ok)return false;}
     return true;
@@ -2287,6 +2308,21 @@ function kpiFilterClick(selectId,value,filterFn){
   sel.value=(sel.value===value)?'':value;
   filterFn();
 }
+
+/* Sets one or more filter dropdowns to exact values, switches tab, then filters.
+   Used for drill-down clicks on Overview widgets (rows/cards that always point
+   to one specific list, as opposed to the toggle behavior of kpiFilterClick). */
+function goFilter(tab,sets){
+  switchTab(tab);
+  const fns={statutory:doFilter,requirements:reqDoFilter,payroll:payDoFilter};
+  Object.keys(sets).forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value=sets[id];
+  });
+  const fn=fns[tab];
+  if(fn)fn();
+}
+function jsAttr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 function exportXLSX(){
   const h=COLS.map(c=>c.label);
