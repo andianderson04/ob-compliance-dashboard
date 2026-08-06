@@ -1360,7 +1360,7 @@ const JOB_TYPES=['Signed Job offer and Employment Contract'];
 const BIRTH_TYPES=['Birth Certificate','Photocopy Birth Certificate (3 copies)'];
 const EDUC_TYPES=['Proof of Education (Diploma / Certificate of Graduation / TOR)'];
 
-let all=[], filtered=[], page=1, perPage=50, sortKey='doj', sortDir=1;
+let all=[], allEmpFull=[], filtered=[], page=1, perPage=50, sortKey='doj', sortDir=1;
 let badgesLoaded={stat:false,req:false,pay:false};
 let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='doj', reqSortDir=1;
 let payAll=[], payFiltered=[], payPage=1, payPerPage=50, paySortKey='doj', paySortDir=1;
@@ -1535,13 +1535,14 @@ async function syncTable(key,table,applyFn,{withMeta=false}={}){
 }
 
 function applyStatutoryData(data){
-  all=data.map(r=>(({
+  allEmpFull=data.map(r=>(({
     id:r.employee_code,name:r.employee_name,email:r.email,
     estat:r.employment_status,etype:r.employment_type,desig:r.designation,
     branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,intOrder:r.internal_order,
     doj:r.date_of_joining,tin:r.tin,sss:r.sss,pag:r.pagibig,ph:r.philhealth,
     l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
   })));
+  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));
   buildFilters();doFilter();
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
   badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();allEmpRefreshBase();
@@ -1586,7 +1587,8 @@ async function init(){
   document.getElementById('header-greeting').innerHTML=esc(greeting.text)+' <span class="header-greeting-emoji">'+greeting.emoji+'</span>';
   // 1. Load embedded immediately
   const json=await decompress(EMBEDDED_B64);
-  all=JSON.parse(json);
+  allEmpFull=JSON.parse(json);
+  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
@@ -2021,11 +2023,13 @@ function processFile(buffer,status){
         });
         // Dedupe by employee code, keeping whichever row has the most recent Date of Joining.
         // A blank/unparseable doj never displaces a record that already has one.
+        // This pool keeps every employment status — Statutory/Requirements/Payroll/Overview
+        // narrow it down to Active/Off-Roster/Off-Detailing further down; All Employee List uses it as-is.
         const existing=byEmployee.get(ecode);
         const isNewer=!existing||(obj.doj&&(!existing.doj||obj.doj>existing.doj));
         if(isNewer){
           byEmployee.set(ecode,obj);
-          if(bankIdx!==undefined){
+          if(bankIdx!==undefined&&VALID_STATUSES.includes(obj.estat)){
             const bankRaw=String(row[bankIdx]||'').trim();
             const etypeNorm=(obj.etype||'').trim().toUpperCase();
             if((bankRaw===''||bankRaw==='0')&&etypeNorm!=='SEASONAL'){
@@ -2042,15 +2046,15 @@ function processFile(buffer,status){
       }
       status.textContent='Processing\u2026 '+Math.round((i/json.length)*100)+'%';
       if(i<json.length){setTimeout(chunkProcess,0);return;}
-      const processed=[...byEmployee.values()];
+      allEmpFull=[...byEmployee.values()];
+      all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));
       const bankRecords=[...bankByEmployee.values()];
-      all=processed;
       window._lastUploadedBankMap=bankRecords;
       document.getElementById('hdr-count').textContent=all.length.toLocaleString();
       badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();allEmpRefreshBase();
       buildFilters();doFilter();setAsOfDate(new Date());
       status.textContent='\u2713 Loaded '+all.length.toLocaleString()+' employees. Saving to database\u2026';
-      const statRecords=all.map(r=>({
+      const statRecords=allEmpFull.map(r=>({
         employee_code:r.id,employee_name:r.name,email:r.email,
         employment_status:r.estat,employment_type:r.etype,designation:r.desig,
         branch:r.branch,entity:r.entity,department:r.dept,section:r.sec,internal_order:r.intOrder,
@@ -2111,7 +2115,7 @@ function processReqFile(buffer,status){
         const row=rawRows[i];
         if(!row||!row.length)continue;
         const estat=String(row[ci['EMPLOYMENT STATUS']]||'').trim();
-        if(!estat)continue;
+        if(!VALID_STATUSES.includes(estat))continue;
         const ecode=String(row[ci['EMPLOYEECODE']]||'').trim();
         if(!ecode||!/^\d+$/.test(ecode))continue;
         if(!empInfo[ecode])empInfo[ecode]={id:ecode,
@@ -2801,7 +2805,7 @@ const ALLEMP_COLS = [
 ];
 
 function allEmpRefreshBase(){
-  allEmpBase=all.filter(r=>r.doj&&r.doj>=ALLEMP_CUTOFF);
+  allEmpBase=allEmpFull.filter(r=>r.doj&&r.doj>=ALLEMP_CUTOFF);
   const badge=document.getElementById('tab-cnt-allemp');
   if(badge)badge.textContent=allEmpBase.length.toLocaleString();
   const sec=document.getElementById('section-allemp');
