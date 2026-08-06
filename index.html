@@ -447,6 +447,10 @@ tbody tr:hover td:first-child{background:#F7F4EC}
       <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 6l6-4 6 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 6.5v6h10v-6" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 9v2.5M9.5 9v2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
       <span class="tab-btn-label">RCBC Payroll</span><span class="tab-badge" id="tab-cnt-payroll">&mdash;</span>
     </button>
+    <button class="tab-btn" id="tab-btn-allemp" onclick="switchTab('allemp')">
+      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="5.5" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="5.5" r="1.6" stroke="currentColor" stroke-width="1.2"/><path d="M2 13c0-2 1.6-3.3 3.5-3.3S9 11 9 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M9.8 9.9c1.7.2 2.9 1.4 2.9 3.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      <span class="tab-btn-label">All Employee List</span><span class="tab-badge" id="tab-cnt-allemp">&mdash;</span>
+    </button>
     <div class="sidebar-section-label" style="margin-top:auto">Quick Actions</div>
     <button class="sidebar-action-btn" onclick="openModal('statutory')">
       <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 10V2M5 5l3-3 3 3M2.5 11v1.5a1 1 0 001 1h9a1 1 0 001-1V11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -563,6 +567,9 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 
   <!-- PAYROLL SECTION -->
   <div id="section-payroll" style="display:none"></div>
+
+  <!-- ALL EMPLOYEE LIST SECTION -->
+  <div id="section-allemp" style="display:none"></div>
 
   <!-- SHARED: toolbar + table + footer (statutory) -->
   <div id="section-shared" style="display:none">
@@ -1357,6 +1364,7 @@ let all=[], filtered=[], page=1, perPage=50, sortKey='doj', sortDir=1;
 let badgesLoaded={stat:false,req:false,pay:false};
 let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='doj', reqSortDir=1;
 let payAll=[], payFiltered=[], payPage=1, payPerPage=50, paySortKey='doj', paySortDir=1;
+let allEmpBase=[], allEmpFiltered=[], allEmpPage=1, allEmpPerPage=50, allEmpSortKey='doj', allEmpSortDir=-1;
 let trendChart=null;
 function renderTrendChart(rows){
   const wrap=document.getElementById('trendChartWrap');
@@ -1536,7 +1544,7 @@ function applyStatutoryData(data){
   })));
   buildFilters();doFilter();
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
-  badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
+  badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();allEmpRefreshBase();
 }
 
 function applyRequirementsData(data){
@@ -1582,7 +1590,7 @@ async function init(){
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
-  badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
+  badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();allEmpRefreshBase();
   buildFilters(); buildHead(); buildColumnPicker(); doFilter();
   animateNum(document.getElementById('statDonutRate'));
   initReqs(); initPayroll();
@@ -1865,14 +1873,16 @@ function renderOverviewKPICards(){
 /* ── TAB SWITCHING ── */
 function switchTab(tab){
   currentTab=tab;
-  ['overview','statutory','requirements','payroll'].forEach(t=>{
+  ['overview','statutory','requirements','payroll','allemp'].forEach(t=>{
     document.getElementById('tab-btn-'+t).classList.toggle('active',t===tab);
   });
   document.getElementById('section-overview').style.display=tab==='overview'?'':'none';
   document.getElementById('section-requirements').style.display=tab==='requirements'?'':'none';
   document.getElementById('section-payroll').style.display=tab==='payroll'?'':'none';
+  document.getElementById('section-allemp').style.display=tab==='allemp'?'':'none';
   document.getElementById('section-shared').style.display=tab==='statutory'?'':'none';
   if(tab==='overview'){renderOverviewFocus();renderOverviewKPICards();}
+  if(tab==='allemp'){allEmpRefreshBase();}
 }
 
 function toggleSidebar(){
@@ -1992,7 +2002,7 @@ function processFile(buffer,status){
     const ci={};headers.forEach((h,i)=>{ci[h]=i;});
     const statIdx=ci['EMPLOYMENT STATUS'],ecodeIdx=ci['EMPLOYEECODE'],bankIdx=ci['BANKNAME'];
     status.textContent='Processing\u2026 0%';
-    const CHUNK=5000;let i=1;const processed=[];const bankRecords=[];const seen=new Set();
+    const CHUNK=5000;let i=1;const byEmployee=new Map();const bankByEmployee=new Map();
     function chunkProcess(){
       const end=Math.min(i+CHUNK,json.length);
       for(;i<end;i++){
@@ -2009,26 +2019,35 @@ function processFile(buffer,status){
           if(col==='DATE OF JOINING'&&v){const d=new Date(v);if(!isNaN(d))v=d.toISOString().slice(0,10);}
           obj[KEY_MAP[col]]=v;
         });
-        const key=JSON.stringify(obj);
-        if(!seen.has(key)){
-          seen.add(key);processed.push(obj);
+        // Dedupe by employee code, keeping whichever row has the most recent Date of Joining.
+        // A blank/unparseable doj never displaces a record that already has one.
+        const existing=byEmployee.get(ecode);
+        const isNewer=!existing||(obj.doj&&(!existing.doj||obj.doj>existing.doj));
+        if(isNewer){
+          byEmployee.set(ecode,obj);
           if(bankIdx!==undefined){
             const bankRaw=String(row[bankIdx]||'').trim();
             const etypeNorm=(obj.etype||'').trim().toUpperCase();
-            if((bankRaw===''||bankRaw==='0')&&etypeNorm!=='SEASONAL')bankRecords.push({
-              id:obj.id,name:obj.name,email:obj.email,estat:obj.estat,etype:obj.etype,
-              branch:obj.branch,entity:obj.entity,dept:obj.dept,sec:obj.sec,doj:obj.doj,
-              l1:obj.l1,l2:obj.l2,l3:obj.l3,bankMissing:true
-            });
+            if((bankRaw===''||bankRaw==='0')&&etypeNorm!=='SEASONAL'){
+              bankByEmployee.set(ecode,{
+                id:obj.id,name:obj.name,email:obj.email,estat:obj.estat,etype:obj.etype,
+                branch:obj.branch,entity:obj.entity,dept:obj.dept,sec:obj.sec,doj:obj.doj,
+                l1:obj.l1,l2:obj.l2,l3:obj.l3,bankMissing:true
+              });
+            }else{
+              bankByEmployee.delete(ecode);
+            }
           }
         }
       }
       status.textContent='Processing\u2026 '+Math.round((i/json.length)*100)+'%';
       if(i<json.length){setTimeout(chunkProcess,0);return;}
+      const processed=[...byEmployee.values()];
+      const bankRecords=[...bankByEmployee.values()];
       all=processed;
       window._lastUploadedBankMap=bankRecords;
       document.getElementById('hdr-count').textContent=all.length.toLocaleString();
-      badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
+      badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();allEmpRefreshBase();
       buildFilters();doFilter();setAsOfDate(new Date());
       status.textContent='\u2713 Loaded '+all.length.toLocaleString()+' employees. Saving to database\u2026';
       const statRecords=all.map(r=>({
@@ -2764,6 +2783,166 @@ function exportPayXLSX(){
   const ws=XLSX.utils.aoa_to_sheet([h,...d]);const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'RCBC Payroll');
   XLSX.writeFile(wb,'RCBC_Payroll_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+/* ── ALL EMPLOYEE LIST (Jan 2025–present, sourced from the same Statutory data — no separate upload) ── */
+const ALLEMP_CUTOFF='2025-01-01';
+const ALLEMP_COLS = [
+  {k:'id',      label:'Employee Code',    w:120, mono:true},
+  {k:'name',    label:'Employee Name',    w:220},
+  {k:'estat',   label:'Status',           w:100, status:true},
+  {k:'etype',   label:'Emp. Type',        w:110},
+  {k:'intOrder',label:'Internal Order',   w:130},
+  {k:'desig',   label:'Designation',      w:190},
+  {k:'branch',  label:'Branch',           w:100},
+  {k:'entity',  label:'Entity',           w:210},
+  {k:'dept',    label:'Department',       w:165},
+  {k:'sec',     label:'Section',          w:130},
+  {k:'doj',     label:'Date of Joining',  w:115, mono:true},
+  {k:'l1',      label:'L1 Manager',       w:170},
+  {k:'l2',      label:'L2 Dept. Manager', w:170},
+  {k:'l3',      label:'L3 Dept. Head',    w:170},
+];
+
+function allEmpRefreshBase(){
+  allEmpBase=all.filter(r=>r.doj&&r.doj>=ALLEMP_CUTOFF);
+  const badge=document.getElementById('tab-cnt-allemp');
+  if(badge)badge.textContent=allEmpBase.length.toLocaleString();
+  const sec=document.getElementById('section-allemp');
+  if(sec&&!sec.innerHTML.trim())sec.innerHTML=buildAllEmpHTML();
+  allEmpBuildFilters();
+  allEmpDoFilter();
+}
+
+function buildAllEmpHTML(){
+  return `
+  <div class="data-card-outer"><div class="data-card">
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.4"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <input type="text" id="aeq" placeholder="Search name, code&hellip;" oninput="allEmpDoFilter()">
+    </div>
+    <div class="tdiv"></div>
+    <select class="filter-sel" id="ae-entity" onchange="allEmpDoFilter()"><option value="">All entities</option></select>
+    <select class="filter-sel" id="ae-dept"   onchange="allEmpDoFilter()"><option value="">All departments</option></select>
+    <select class="filter-sel" id="ae-branch" onchange="allEmpDoFilter()"><option value="">All branches</option></select>
+    <select class="filter-sel" id="ae-etype"  onchange="allEmpDoFilter()"><option value="">All emp. types</option></select>
+    <select class="filter-sel" id="ae-estat"  onchange="allEmpDoFilter()"><option value="">All statuses</option></select>
+    <div class="tdiv"></div>
+    <div class="toolbar-right">
+      <span class="rec-pill" id="ae-count-pill">&mdash;</span>
+      <button class="btn-export" onclick="exportAllEmpXLSX()">
+        <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Export
+      </button>
+    </div>
+  </div>
+  <div class="chart-empty" style="padding:10px 20px 0;text-align:left;font-style:normal;font-size:11.5px">Showing employees hired January 2025 to present.</div>
+  <div class="table-outer">
+    <table><thead><tr id="ae-thead"></tr></thead><tbody id="ae-tbody"></tbody></table>
+  </div>
+  <div class="footer">
+    <span class="page-info" id="ae-page-info"></span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="page-btns" id="ae-page-btns"></div>
+      <select class="pp-sel" onchange="allEmpPerPage=+this.value;allEmpPage=1;allEmpRender()">
+        <option value="25">25 / page</option><option value="50" selected>50 / page</option><option value="100">100 / page</option>
+      </select>
+    </div>
+  </div>
+  </div></div>`;
+}
+
+function allEmpBuildFilters(){
+  const se=new Set,sd=new Set,sb=new Set,st=new Set,ss=new Set;
+  allEmpBase.forEach(r=>{
+    if(r.entity)se.add(r.entity);if(r.dept)sd.add(r.dept);
+    if(r.branch)sb.add(r.branch);if(r.etype)st.add(r.etype);if(r.estat)ss.add(r.estat);
+  });
+  const fill=(id,set,ph)=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    el.innerHTML='<option value="">'+ph+'</option>';
+    [...set].sort().forEach(v=>{const o=document.createElement('option');o.value=o.text=v;el.appendChild(o);});
+    if([...set].includes(cur))el.value=cur;
+  };
+  fill('ae-entity',se,'All entities');fill('ae-dept',sd,'All departments');
+  fill('ae-branch',sb,'All branches');fill('ae-etype',st,'All emp. types');fill('ae-estat',ss,'All statuses');
+}
+
+function allEmpBuildHead(){
+  const tr=document.getElementById('ae-thead');if(!tr||tr.children.length>0)return;
+  ALLEMP_COLS.forEach(c=>{
+    const th=document.createElement('th');
+    th.style.minWidth=c.w+'px';
+    th.innerHTML=c.label+' <span class="arr">&#8597;</span>';
+    th.onclick=()=>allEmpSortBy(c.k,th);
+    if(c.k===allEmpSortKey){th.classList.add('sorted');const a=th.querySelector('.arr');if(a)a.textContent=allEmpSortDir===1?'↑':'↓';}
+    tr.appendChild(th);
+  });
+}
+
+function allEmpApplySort(){
+  if(!allEmpSortKey)return;
+  allEmpFiltered.sort((a,b)=>{
+    const av=a[allEmpSortKey],bv=b[allEmpSortKey];
+    const ae=av===undefined||av===null||av==='',be=bv===undefined||bv===null||bv==='';
+    if(ae&&be)return 0;if(ae)return 1;if(be)return -1;
+    return av===bv?0:av>bv?allEmpSortDir:-allEmpSortDir;
+  });
+}
+
+function allEmpSortBy(k,thEl){
+  if(allEmpSortKey===k)allEmpSortDir*=-1;else{allEmpSortKey=k;allEmpSortDir=1;}
+  document.querySelectorAll('#ae-thead th').forEach(t=>t.classList.remove('sorted'));
+  if(thEl){thEl.classList.add('sorted');const a=thEl.querySelector('.arr');if(a)a.textContent=allEmpSortDir===1?'↑':'↓';}
+  allEmpApplySort();
+  allEmpPage=1;allEmpRender();
+}
+
+function allEmpDoFilter(){
+  const q=(document.getElementById('aeq')?.value||'').toLowerCase();
+  const fe=document.getElementById('ae-entity')?.value||'';
+  const fd=document.getElementById('ae-dept')?.value||'';
+  const fb=document.getElementById('ae-branch')?.value||'';
+  const ft=document.getElementById('ae-etype')?.value||'';
+  const fs=document.getElementById('ae-estat')?.value||'';
+  allEmpFiltered=allEmpBase.filter(r=>{
+    if(q&&!(r.id+' '+r.name+' '+(r.desig||'')).toLowerCase().includes(q))return false;
+    if(fe&&r.entity!==fe)return false;if(fd&&r.dept!==fd)return false;
+    if(fb&&r.branch!==fb)return false;if(ft&&r.etype!==ft)return false;
+    if(fs&&r.estat!==fs)return false;
+    return true;
+  });
+  allEmpApplySort();
+  allEmpPage=1;
+  const cp=document.getElementById('ae-count-pill');if(cp)cp.textContent=allEmpFiltered.length.toLocaleString()+' records';
+  allEmpRender();
+}
+
+function allEmpRender(){
+  allEmpBuildHead();
+  const totalP=Math.max(1,Math.ceil(allEmpFiltered.length/allEmpPerPage));
+  allEmpPage=Math.min(Math.max(1,allEmpPage),totalP);
+  const s=(allEmpPage-1)*allEmpPerPage,e=Math.min(s+allEmpPerPage,allEmpFiltered.length);
+  const tb=document.getElementById('ae-tbody');
+  if(!tb)return;
+  tb.innerHTML=allEmpFiltered.slice(s,e).map(r=>`<tr>${ALLEMP_COLS.map(c=>{
+    const v=r[c.k]||'';
+    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':'s-offdetailing';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
+    return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
+  }).join('')}</tr>`).join('');
+  const pi=document.getElementById('ae-page-info');
+  if(pi)pi.textContent=`${(s+1).toLocaleString()}–${e.toLocaleString()} of ${allEmpFiltered.length.toLocaleString()} records`;
+  buildPagination('ae-page-btns',allEmpPage,totalP,p=>{allEmpPage=p;allEmpRender();});
+}
+
+function exportAllEmpXLSX(){
+  const h=ALLEMP_COLS.map(c=>c.label);
+  const d=allEmpFiltered.map(r=>ALLEMP_COLS.map(c=>r[c.k]||''));
+  const ws=XLSX.utils.aoa_to_sheet([h,...d]);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'All Employees');
+  XLSX.writeFile(wb,'TA_AllEmployees_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 /* ── AUTO-RELOAD ── */
