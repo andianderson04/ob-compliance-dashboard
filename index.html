@@ -64,9 +64,9 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .vdiv{width:1px;height:20px;background:var(--rule)}
 
 /* TABS */
-.app-shell{display:flex;align-items:stretch;min-height:60vh}
+.app-shell{display:flex;align-items:flex-start;min-height:60vh}
 .main-content{flex:1;min-width:0}
-.tab-nav{background:var(--surface);border-right:1px solid var(--rule);padding:16px 12px;display:flex;flex-direction:column;gap:2px;width:236px;flex-shrink:0;transition:width .2s ease}
+.tab-nav{background:var(--surface);border-right:1px solid var(--rule);padding:16px 12px;display:flex;flex-direction:column;gap:2px;width:236px;flex-shrink:0;min-height:calc(100vh - 84px);transition:width .2s ease}
 .tab-btn{height:auto;padding:9px 10px;background:none;border:none;border-radius:8px;border-left:3px solid transparent;
   font-family:var(--sans);font-size:13px;font-weight:500;color:var(--ink-2);cursor:pointer;
   display:flex;align-items:center;gap:9px;transition:all .15s;text-align:left}
