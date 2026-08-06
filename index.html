@@ -1349,8 +1349,8 @@ const EDUC_TYPES=['Proof of Education (Diploma / Certificate of Graduation / TOR
 
 let all=[], filtered=[], page=1, perPage=50, sortKey='doj', sortDir=1;
 let badgesLoaded={stat:false,req:false,pay:false};
-let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='', reqSortDir=1;
-let payAll=[], payFiltered=[], payPage=1, payPerPage=50, paySortKey='', paySortDir=1;
+let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='doj', reqSortDir=1;
+let payAll=[], payFiltered=[], payPage=1, payPerPage=50, paySortKey='doj', paySortDir=1;
 let trendChart=null;
 function renderTrendChart(rows){
   const wrap=document.getElementById('trendChartWrap');
@@ -2198,7 +2198,12 @@ function buildHead(){
 
 function applySort(){
   if(!sortKey)return;
-  filtered.sort((a,b)=>a[sortKey]===b[sortKey]?0:a[sortKey]>b[sortKey]?sortDir:-sortDir);
+  filtered.sort((a,b)=>{
+    const av=a[sortKey],bv=b[sortKey];
+    const ae=av===undefined||av===null||av==='',be=bv===undefined||bv===null||bv==='';
+    if(ae&&be)return 0;if(ae)return 1;if(be)return -1;
+    return av===bv?0:av>bv?sortDir:-sortDir;
+  });
 }
 
 function sortBy(k,thEl){
@@ -2478,7 +2483,18 @@ function buildReqHead(){
     if(c.thCls)th.className=c.thCls;
     th.innerHTML=c.label+' <span class="arr" id="rarr-'+c.k+'">&#8597;</span>';
     th.onclick=()=>reqSortBy(c.k,th);
+    if(c.k===reqSortKey){th.classList.add('sorted');const a=th.querySelector('.arr');if(a)a.textContent=reqSortDir===1?'↑':'↓';}
     tr.appendChild(th);
+  });
+}
+
+function reqApplySort(){
+  if(!reqSortKey)return;
+  reqFiltered.sort((a,b)=>{
+    const av=a[reqSortKey],bv=b[reqSortKey];
+    const ae=av===undefined||av===null||av==='',be=bv===undefined||bv===null||bv==='';
+    if(ae&&be)return 0;if(ae)return 1;if(be)return -1;
+    return av===bv?0:av>bv?reqSortDir:-reqSortDir;
   });
 }
 
@@ -2486,7 +2502,7 @@ function reqSortBy(k,thEl){
   if(reqSortKey===k)reqSortDir*=-1;else{reqSortKey=k;reqSortDir=1;}
   document.querySelectorAll('#req-thead th').forEach(t=>t.classList.remove('sorted'));
   if(thEl){thEl.classList.add('sorted');const a=thEl.querySelector('.arr');if(a)a.textContent=reqSortDir===1?'↑':'↓';}
-  reqFiltered.sort((a,b)=>a[k]===b[k]?0:a[k]>b[k]?reqSortDir:-reqSortDir);
+  reqApplySort();
   reqPage=1;reqRender();
 }
 
@@ -2511,6 +2527,7 @@ function reqDoFilter(){
       if(fcs==='COMPLETE'&&!ok)return false;if(fcs==='INCOMPLETE'&&ok)return false;}
     return true;
   });
+  reqApplySort();
   reqPage=1;reqUpdateKPIs();reqRender();
 }
 
@@ -2671,7 +2688,19 @@ function buildPayHead(){
   PAY_COLS.forEach(c=>{
     const th=document.createElement('th');th.style.minWidth=c.w+'px';
     th.innerHTML=c.label+' <span class="arr">&#8597;</span>';
-    th.onclick=()=>paySortBy(c.k,th);tr.appendChild(th);
+    th.onclick=()=>paySortBy(c.k,th);
+    if(c.k===paySortKey){th.classList.add('sorted');const a=th.querySelector('.arr');if(a)a.textContent=paySortDir===1?'↑':'↓';}
+    tr.appendChild(th);
+  });
+}
+
+function payApplySort(){
+  if(!paySortKey)return;
+  payFiltered.sort((a,b)=>{
+    const av=a[paySortKey],bv=b[paySortKey];
+    const ae=av===undefined||av===null||av==='',be=bv===undefined||bv===null||bv==='';
+    if(ae&&be)return 0;if(ae)return 1;if(be)return -1;
+    return av===bv?0:av>bv?paySortDir:-paySortDir;
   });
 }
 
@@ -2679,7 +2708,7 @@ function paySortBy(k,thEl){
   if(paySortKey===k)paySortDir*=-1;else{paySortKey=k;paySortDir=1;}
   document.querySelectorAll('#pay-thead th').forEach(t=>t.classList.remove('sorted'));
   if(thEl){thEl.classList.add('sorted');const a=thEl.querySelector('.arr');if(a)a.textContent=paySortDir===1?'↑':'↓';}
-  payFiltered.sort((a,b)=>a[k]===b[k]?0:a[k]>b[k]?paySortDir:-paySortDir);
+  payApplySort();
   payPage=1;payRender();
 }
 
@@ -2695,6 +2724,7 @@ function payDoFilter(){
     if(fb&&r.branch!==fb)return false;if(fs&&r.estat!==fs)return false;
     return true;
   });
+  payApplySort();
   payPage=1;payUpdateKPIs();payRender();
 }
 
