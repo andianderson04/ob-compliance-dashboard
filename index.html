@@ -1443,7 +1443,11 @@ async function supabaseLoad(table){
 }
 async function supabaseSave(table,records){
   try{
-    await fetch(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':''}});
+    const delRes=await fetch(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':'return=minimal'}});
+    if(!delRes.ok){
+      console.error(`supabaseSave: failed to clear ${table} before write (status ${delRes.status}) — aborting to avoid merging with stale rows.`);
+      return false;
+    }
     for(let i=0;i<records.length;i+=500){
       const res=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify(records.slice(i,i+500))});
       if(!res.ok)return false;
@@ -1452,6 +1456,21 @@ async function supabaseSave(table,records){
     await fetch(`${SUPA_URL}/rest/v1/dashboard_meta`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify([{key:`last_updated_${table}`,value:new Date().toISOString()}])});
     return true;
   }catch(e){return false;}
+}
+/* Defensive dedup applied to ANY employee list right before it's used — by employee code,
+   most-recent Date of Joining wins, same rule as the upload parser. This is a safety net:
+   even if stale/duplicate rows are already sitting in the database (from a bad prior save,
+   a direct API edit, or anything else), the app never displays them duplicated. */
+function dedupeByEmployee(records){
+  const byId=new Map();
+  records.forEach(r=>{
+    const id=r.id;
+    if(!id)return;
+    const existing=byId.get(id);
+    const isNewer=!existing||(r.doj&&(!existing.doj||r.doj>existing.doj));
+    if(isNewer)byId.set(id,r);
+  });
+  return [...byId.values()];
 }
 /* Compliance trend: unlike the other tables, this one is APPENDED to over time,
    never wiped. Each day gets at most one row, upserted by snapshot_date so the
@@ -1535,13 +1554,13 @@ async function syncTable(key,table,applyFn,{withMeta=false}={}){
 }
 
 function applyStatutoryData(data){
-  allEmpFull=data.map(r=>(({
+  allEmpFull=dedupeByEmployee(data.map(r=>(({
     id:r.employee_code,name:r.employee_name,email:r.email,
     estat:r.employment_status,etype:r.employment_type,desig:r.designation,
     branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,intOrder:r.internal_order,
     doj:r.date_of_joining,tin:r.tin,sss:r.sss,pag:r.pagibig,ph:r.philhealth,
     l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
-  })));
+  }))));
   all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));
   buildFilters();doFilter();
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
@@ -1587,7 +1606,7 @@ async function init(){
   document.getElementById('header-greeting').innerHTML=esc(greeting.text)+' <span class="header-greeting-emoji">'+greeting.emoji+'</span>';
   // 1. Load embedded immediately
   const json=await decompress(EMBEDDED_B64);
-  allEmpFull=JSON.parse(json);
+  allEmpFull=dedupeByEmployee(JSON.parse(json));
   all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('app').style.display='block';
