@@ -44,6 +44,9 @@ body{font-family:var(--sans);background:var(--page);color:var(--ink);font-size:1
 .sync-warning .sw-icon{font-size:14px}
 .sync-warning button{font-family:var(--display);font-size:12px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid #FBBF24;background:#FFFFFF;color:#92400E;cursor:pointer}
 .sync-warning button:hover{background:#F6E9CC}
+.sync-progress{display:none;align-items:center;gap:9px;background:var(--blue-light);border-bottom:1px solid #C7D2FE;color:#3730A3;padding:8px 20px;font-size:12.5px}
+.sync-progress .spinner{width:12px;height:12px;border:2px solid #C7D2FE;border-top-color:var(--blue);border-radius:50%;animation:sync-spin .7s linear infinite;flex-shrink:0}
+@keyframes sync-spin{to{transform:rotate(360deg)}}
 .sync-warning button:disabled{opacity:.6;cursor:default}
 .header-right{display:flex;align-items:center;gap:12px;padding:16px 0;
   border-left:1px solid var(--rule);padding-left:24px}
@@ -428,6 +431,10 @@ tbody tr:hover td:first-child{background:#F7F4EC}
   <div class="sync-warning" id="sync-warning">
     <span class="sw-text"><span class="sw-icon">&#9888;&#65039;</span><span id="sync-warning-text"></span></span>
     <button id="sync-retry-btn" onclick="retrySyncAll()">Retry now</button>
+  </div>
+  <div class="sync-progress" id="sync-progress">
+    <span class="spinner"></span>
+    <span>Refreshing with the latest data&hellip;</span>
   </div>
 
   <div class="app-shell">
@@ -1460,19 +1467,48 @@ const SUPA_HEADERS={
   'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'
 };
 async function supabaseLoad(table){
-  try{
-    let records=[],offset=0;
-    while(true){
-      const ctrl=new AbortController();
-      const t=setTimeout(()=>ctrl.abort(),8000);
-      const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*&limit=1000&offset=${offset}`,
-        {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY},signal:ctrl.signal});
+  const PAGE=1000;
+  const fetchPage=async(offset,withCount)=>{
+    const ctrl=new AbortController();
+    const t=setTimeout(()=>ctrl.abort(),8000);
+    try{
+      const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+      if(withCount)headers['Prefer']='count=exact';
+      const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*&limit=${PAGE}&offset=${offset}`,
+        {headers,signal:ctrl.signal});
       clearTimeout(t);
-      if(!res.ok){return null;}
+      if(!res.ok)return null;
       const batch=await res.json();
-      records=records.concat(batch);
-      if(batch.length<1000)break;
-      offset+=1000;
+      let total=null;
+      const range=res.headers.get('content-range'); // e.g. "0-999/10136"
+      if(range){const m=range.match(/\/(\d+)$/);if(m)total=parseInt(m[1],10);}
+      return{batch,total};
+    }catch(e){clearTimeout(t);return null;}
+  };
+  try{
+    // First page also asks for the exact total row count, so every remaining page
+    // can be requested in parallel instead of one round-trip at a time.
+    const first=await fetchPage(0,true);
+    if(!first)return null;
+    let records=first.batch.slice();
+    if(first.total!=null&&first.total>records.length){
+      const offsets=[];
+      for(let off=PAGE;off<first.total;off+=PAGE)offsets.push(off);
+      const pages=await Promise.all(offsets.map(off=>fetchPage(off,false)));
+      for(const p of pages){
+        if(!p)return null; // any page failing invalidates the whole load — never show partial data
+        records=records.concat(p.batch);
+      }
+    }else if(first.total==null&&first.batch.length===PAGE){
+      // Fallback if the server didn't report a count for some reason — walk sequentially.
+      let offset=PAGE;
+      while(true){
+        const p=await fetchPage(offset,false);
+        if(!p)return null;
+        records=records.concat(p.batch);
+        if(p.batch.length<PAGE)break;
+        offset+=PAGE;
+      }
     }
     return records.length>0?records:null;
   }catch(e){return null;}
@@ -1565,7 +1601,15 @@ function updateSyncBanner(){
   banner.style.display='flex';
 }
 
+let syncInFlight=0;
+function updateSyncProgress(){
+  const el=document.getElementById('sync-progress');
+  if(!el)return;
+  el.style.display=syncInFlight>0?'flex':'none';
+}
+
 async function syncTable(key,table,applyFn,{withMeta=false}={}){
+  syncInFlight++;updateSyncProgress();
   try{
     const data=await supabaseLoad(table);
     if(data&&data.length>0){
@@ -1585,6 +1629,7 @@ async function syncTable(key,table,applyFn,{withMeta=false}={}){
   }catch(e){
     syncState[key]=false;
   }
+  syncInFlight=Math.max(0,syncInFlight-1);updateSyncProgress();
   updateSyncBanner();
   return syncState[key];
 }
