@@ -1347,7 +1347,7 @@ const JOB_TYPES=['Signed Job offer and Employment Contract'];
 const BIRTH_TYPES=['Birth Certificate','Photocopy Birth Certificate (3 copies)'];
 const EDUC_TYPES=['Proof of Education (Diploma / Certificate of Graduation / TOR)'];
 
-let all=[], filtered=[], page=1, perPage=50, sortKey='', sortDir=1;
+let all=[], filtered=[], page=1, perPage=50, sortKey='doj', sortDir=1;
 let badgesLoaded={stat:false,req:false,pay:false};
 let reqAll=[], reqFiltered=[], reqPage=1, reqPerPage=50, reqSortKey='', reqSortDir=1;
 let payAll=[], payFiltered=[], payPage=1, payPerPage=50, paySortKey='', paySortDir=1;
@@ -2191,8 +2191,14 @@ function buildHead(){
     th.style.minWidth=c.w+'px';
     th.innerHTML=c.label+' <span class="arr" id="arr-'+c.k+'">&#8597;</span>';
     th.onclick=()=>sortBy(c.k,th);
+    if(c.k===sortKey){th.classList.add('sorted');const a=th.querySelector('.arr');if(a)a.textContent=sortDir===1?'↑':'↓';}
     tr.appendChild(th);
   });
+}
+
+function applySort(){
+  if(!sortKey)return;
+  filtered.sort((a,b)=>a[sortKey]===b[sortKey]?0:a[sortKey]>b[sortKey]?sortDir:-sortDir);
 }
 
 function sortBy(k,thEl){
@@ -2200,7 +2206,7 @@ function sortBy(k,thEl){
   document.querySelectorAll('#thead-row th').forEach(t=>t.classList.remove('sorted'));
   document.querySelectorAll('.arr').forEach(e=>e.textContent='⇕');
   if(thEl){thEl.classList.add('sorted');const a=thEl.querySelector('.arr');if(a)a.textContent=sortDir===1?'↑':'↓';}
-  filtered.sort((a,b)=>a[k]===b[k]?0:a[k]>b[k]?sortDir:-sortDir);
+  applySort();
   page=1;render();
 }
 
@@ -2241,6 +2247,7 @@ function doFilter(){
       if(fcs==='COMPLETE'&&!ok)return false;if(fcs==='INCOMPLETE'&&ok)return false;}
     return true;
   });
+  applySort();
   page=1;updateKPIs();render();
 }
 
