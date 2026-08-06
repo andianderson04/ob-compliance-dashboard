@@ -274,6 +274,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 .s-active{background:var(--success-dim);color:var(--success)}
 .s-offroster{background:#FEF3C7;color:#92400E}
 .s-offdetailing{background:#E9EEF3;color:#2C4763}
+.s-other{background:#F1F5F9;color:#475569}
 .tick{display:inline-block;width:22px;height:22px;border-radius:50%;font-size:11px;
   font-weight:600;line-height:22px;text-align:center;font-family:var(--mono)}
 .tick-y{background:var(--success-dim);color:var(--success)}
@@ -1296,7 +1297,6 @@ const COLS = [
   {k:'entity',label:'Entity',              w:220, hide:true},
   {k:'dept',  label:'Department',          w:165},
   {k:'sec',   label:'Section',             w:130, hide:true},
-  {k:'intOrder', label:'Internal Order',   w:120, mono:true, hide:true},
   {k:'doj',   label:'Date of Joining',     w:115, mono:true},
   {k:'tin',   label:'TIN',                 w:58,  comp:true},
   {k:'sss',   label:'SSS',                 w:58,  comp:true},
@@ -2008,7 +2008,7 @@ function processFile(buffer,status){
       for(;i<end;i++){
         const row=json[i];if(!row||!row.some(x=>x!==''))continue;
         const estat=String(row[statIdx]||'').trim();
-        if(!VALID_STATUSES.includes(estat))continue;
+        if(!estat)continue;
         const ecode=String(row[ecodeIdx]||'').trim();
         if(!ecode||!/^\d+$/.test(ecode))continue;
         const obj={};
@@ -2101,7 +2101,6 @@ function processReqFile(buffer,status){
     if(rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
     const headers=rawRows[0].map(h=>String(h||'').trim());
     const ci={};headers.forEach((h,idx)=>ci[h]=idx);
-    const VALID=new Set(VALID_STATUSES);
     const PEME_S=new Set(PEME_TYPES),NBI_S=new Set(NBI_TYPES),JOB_S=new Set(JOB_TYPES),BIRTH_S=new Set(BIRTH_TYPES),EDUC_S=new Set(EDUC_TYPES);
     const empInfo={},pemeSet=new Set,nbiSet=new Set,jobSet=new Set,birthSet=new Set,educSet=new Set;
     status.textContent='Filtering '+(rawRows.length-1).toLocaleString()+' rows\u2026';
@@ -2112,7 +2111,7 @@ function processReqFile(buffer,status){
         const row=rawRows[i];
         if(!row||!row.length)continue;
         const estat=String(row[ci['EMPLOYMENT STATUS']]||'').trim();
-        if(!VALID.has(estat))continue;
+        if(!estat)continue;
         const ecode=String(row[ci['EMPLOYEECODE']]||'').trim();
         if(!ecode||!/^\d+$/.test(ecode))continue;
         if(!empInfo[ecode])empInfo[ecode]={id:ecode,
@@ -2294,7 +2293,7 @@ function render(){
     const v=r[c.k]||'';
     if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'&#10003;':'&#10007;'}</span></td>`;}
     if(c.cs){const ok=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';return `<td class="comp-cell"><span class="comp-pill ${ok?'comp-ok':'comp-no'}">${ok?'COMPLETE':'INCOMPLETE'}</span></td>`;}
-    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':'s-offdetailing';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
+    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':v==='Off-Detailing'?'s-offdetailing':'s-other';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
     return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
   }).join('')}</tr>`).join('');
   document.getElementById('page-info').textContent=`${(s+1).toLocaleString()}–${e.toLocaleString()} of ${filtered.length.toLocaleString()} records`;
@@ -2630,7 +2629,7 @@ function reqRender(){
     const v=r[c.k]||'';
     if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'&#10003;':'&#10007;'}</span></td>`;}
     if(c.rcs){const ok=r.peme==='Y'&&r.nbi==='Y'&&r.job==='Y'&&r.birth==='Y'&&r.educ==='Y';return `<td class="comp-cell"><span class="comp-pill ${ok?'comp-ok':'comp-no'}">${ok?'COMPLETE':'INCOMPLETE'}</span></td>`;}
-    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':'s-offdetailing';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
+    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':v==='Off-Detailing'?'s-offdetailing':'s-other';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
     return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
   }).join('')}</tr>`).join('');
   const pi=document.getElementById('req-page-info');
@@ -2767,7 +2766,7 @@ function payRender(){
   document.getElementById('pay-tbody').innerHTML=payFiltered.slice(s,e).map(r=>`<tr>${PAY_COLS.map(c=>{
     const v=r[c.k]||'';
     if(c.ps)return `<td class="comp-cell"><span class="payroll-pending">Pending Payroll Account</span></td>`;
-    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':'s-offdetailing';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
+    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':v==='Off-Detailing'?'s-offdetailing':'s-other';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
     return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
   }).join('')}</tr>`).join('');
   const pi=document.getElementById('pay-page-info');
@@ -2799,9 +2798,6 @@ const ALLEMP_COLS = [
   {k:'dept',    label:'Department',       w:165},
   {k:'sec',     label:'Section',          w:130},
   {k:'doj',     label:'Date of Joining',  w:115, mono:true},
-  {k:'l1',      label:'L1 Manager',       w:170},
-  {k:'l2',      label:'L2 Dept. Manager', w:170},
-  {k:'l3',      label:'L3 Dept. Head',    w:170},
 ];
 
 function allEmpRefreshBase(){
@@ -2929,7 +2925,7 @@ function allEmpRender(){
   if(!tb)return;
   tb.innerHTML=allEmpFiltered.slice(s,e).map(r=>`<tr>${ALLEMP_COLS.map(c=>{
     const v=r[c.k]||'';
-    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':'s-offdetailing';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
+    if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':v==='Off-Detailing'?'s-offdetailing':'s-other';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
     return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
   }).join('')}</tr>`).join('');
   const pi=document.getElementById('ae-page-info');
