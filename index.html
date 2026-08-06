@@ -1467,14 +1467,14 @@ const SUPA_HEADERS={
   'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'
 };
 async function supabaseLoad(table){
-  const PAGE=1000;
-  const fetchPage=async(offset,withCount)=>{
+  const REQUESTED_PAGE=1000;
+  const fetchPage=async(offset,limit,withCount)=>{
     const ctrl=new AbortController();
     const t=setTimeout(()=>ctrl.abort(),8000);
     try{
       const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
       if(withCount)headers['Prefer']='count=exact';
-      const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*&limit=${PAGE}&offset=${offset}`,
+      const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*&limit=${limit}&offset=${offset}`,
         {headers,signal:ctrl.signal});
       clearTimeout(t);
       if(!res.ok)return null;
@@ -1488,26 +1488,37 @@ async function supabaseLoad(table){
   try{
     // First page also asks for the exact total row count, so every remaining page
     // can be requested in parallel instead of one round-trip at a time.
-    const first=await fetchPage(0,true);
+    const first=await fetchPage(0,REQUESTED_PAGE,true);
     if(!first)return null;
     let records=first.batch.slice();
-    if(first.total!=null&&first.total>records.length){
+    // Use the page size the server actually returned, not just what we asked for —
+    // some project configs cap rows-per-request lower than the requested limit, and
+    // trusting our own assumed page size there would silently skip rows between pages.
+    const actualPageSize=first.batch.length;
+    if(first.total!=null&&first.total>records.length&&actualPageSize>0){
       const offsets=[];
-      for(let off=PAGE;off<first.total;off+=PAGE)offsets.push(off);
-      const pages=await Promise.all(offsets.map(off=>fetchPage(off,false)));
+      for(let off=actualPageSize;off<first.total;off+=actualPageSize)offsets.push(off);
+      const pages=await Promise.all(offsets.map(off=>fetchPage(off,REQUESTED_PAGE,false)));
       for(const p of pages){
         if(!p)return null; // any page failing invalidates the whole load — never show partial data
         records=records.concat(p.batch);
       }
-    }else if(first.total==null&&first.batch.length===PAGE){
+      // Final check: what we assembled must match what the server itself reported as the
+      // total row count. If it doesn't, something went wrong with the pagination math —
+      // discard the result rather than silently show an incomplete dataset as if it were whole.
+      if(records.length!==first.total){
+        console.error(`supabaseLoad: assembled ${records.length} rows for "${table}" but the server reported ${first.total} total — discarding this load rather than risk showing an incomplete count.`);
+        return null;
+      }
+    }else if(first.total==null&&first.batch.length===REQUESTED_PAGE){
       // Fallback if the server didn't report a count for some reason — walk sequentially.
-      let offset=PAGE;
+      let offset=REQUESTED_PAGE;
       while(true){
-        const p=await fetchPage(offset,false);
+        const p=await fetchPage(offset,REQUESTED_PAGE,false);
         if(!p)return null;
         records=records.concat(p.batch);
-        if(p.batch.length<PAGE)break;
-        offset+=PAGE;
+        if(p.batch.length<REQUESTED_PAGE)break;
+        offset+=REQUESTED_PAGE;
       }
     }
     return records.length>0?records:null;
