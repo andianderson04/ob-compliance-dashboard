@@ -239,6 +239,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 .stat-card-legend-row em{font-style:normal;color:var(--ink-3);font-size:11px}
 .chart-strip-2{grid-template-columns:1.4fr 1fr}
 .chart-strip-3{grid-template-columns:1.25fr 0.85fr 0.9fr}
+.chart-strip-4{grid-template-columns:repeat(4,1fr)}
 
 /* OVERVIEW: FOCUS AREAS */
 .focus-strip{display:grid;grid-template-columns:1fr 1.7fr;gap:16px;padding:20px 24px 24px;background:transparent}
@@ -574,6 +575,40 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 
   <!-- SHARED: toolbar + table + footer (statutory) -->
   <div id="section-shared" style="display:none">
+    <div class="chart-strip chart-strip-4">
+      <div class="chart-panel">
+        <div class="chart-panel-head"><div class="tile-label-row" style="margin-bottom:0"><span class="tile-icon" style="background:#EEF2FF;color:#4338CA;width:24px;height:24px"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><circle cx="5.5" cy="7.5" r="1.3" stroke="currentColor" stroke-width="1.1"/><path d="M3.7 11c.4-1.1 1-1.6 1.8-1.6s1.4.5 1.8 1.6M9.5 6.5h3M9.5 9h2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg></span><span class="chart-panel-label">TIN</span></div></div>
+        <div class="chart-canvas-wrap" style="height:130px">
+          <canvas id="statSplitDonut-tin"></canvas>
+          <div class="donut-center"><div class="donut-center-val" id="statSplitRate-tin" style="font-size:20px">&mdash;</div><div class="donut-center-sub">compliant</div></div>
+        </div>
+        <div class="chart-legend" id="statSplitLegend-tin"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-head"><div class="tile-label-row" style="margin-bottom:0"><span class="tile-icon" style="background:#F5F3FF;color:#7C3AED;width:24px;height:24px"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5.5 2.2v3.6c0 3.3-2.2 5.9-5.5 7.2-3.3-1.3-5.5-3.9-5.5-7.2V3.7L8 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.7 8l1.6 1.6 3-3.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="chart-panel-label">SSS</span></div></div>
+        <div class="chart-canvas-wrap" style="height:130px">
+          <canvas id="statSplitDonut-sss"></canvas>
+          <div class="donut-center"><div class="donut-center-val" id="statSplitRate-sss" style="font-size:20px">&mdash;</div><div class="donut-center-sub">compliant</div></div>
+        </div>
+        <div class="chart-legend" id="statSplitLegend-sss"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-head"><div class="tile-label-row" style="margin-bottom:0"><span class="tile-icon" style="background:#FFF7ED;color:#C2410C;width:24px;height:24px"><svg viewBox="0 0 16 16" fill="none"><path d="M2 7.5L8 2l6 5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.3 6.5V13a.8.8 0 00.8.8h7.8a.8.8 0 00.8-.8V6.5" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M6.3 13.8v-3.3h3.4v3.3" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg></span><span class="chart-panel-label">Pag-IBIG</span></div></div>
+        <div class="chart-canvas-wrap" style="height:130px">
+          <canvas id="statSplitDonut-pag"></canvas>
+          <div class="donut-center"><div class="donut-center-val" id="statSplitRate-pag" style="font-size:20px">&mdash;</div><div class="donut-center-sub">compliant</div></div>
+        </div>
+        <div class="chart-legend" id="statSplitLegend-pag"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-head"><div class="tile-label-row" style="margin-bottom:0"><span class="tile-icon" style="background:#ECFDF5;color:#059669;width:24px;height:24px"><svg viewBox="0 0 16 16" fill="none"><path d="M8 13.8s-5.5-3.3-5.5-7.3a3.1 3.1 0 015.5-2 3.1 3.1 0 015.5 2c0 4-5.5 7.3-5.5 7.3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M6 6.5h1.2l.7-1.3.8 2.6.6-1.3H10" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="chart-panel-label">PhilHealth</span></div></div>
+        <div class="chart-canvas-wrap" style="height:130px">
+          <canvas id="statSplitDonut-ph"></canvas>
+          <div class="donut-center"><div class="donut-center-val" id="statSplitRate-ph" style="font-size:20px">&mdash;</div><div class="donut-center-sub">compliant</div></div>
+        </div>
+        <div class="chart-legend" id="statSplitLegend-ph"></div>
+      </div>
+    </div>
     <div class="data-card-outer"><div class="data-card">
     <div class="toolbar">
       <div class="search-wrap">
@@ -1404,6 +1439,7 @@ async function loadAndRenderTrend(){
 
 let currentTab='overview', modalUploadType='statutory';
 let statDonutChart=null, statBarChart=null, reqDonutChart=null, reqBarChart=null;
+let statSplitCharts={};
 
 /* ── DECOMPRESS ── */
 async function decompress(b64){
@@ -2306,6 +2342,36 @@ function doFilter(){
 function updateKPIs(){
   const t=filtered.length;
   document.getElementById('count-pill').textContent=t.toLocaleString()+' records';
+  updateStatSplitDonuts();
+}
+
+function updateStatSplitDonuts(){
+  const t=filtered.length;
+  const items=[{key:'tin',label:'TIN'},{key:'sss',label:'SSS'},{key:'pag',label:'Pag-IBIG'},{key:'ph',label:'PhilHealth'}];
+  items.forEach(it=>{
+    const missing=filtered.filter(r=>r[it.key]==='X').length;
+    const ok=t-missing;
+    const rate=t?Math.round(ok/t*100):0;
+    const rateEl=document.getElementById('statSplitRate-'+it.key);
+    if(rateEl)rateEl.textContent=rate+'%';
+    const legendEl=document.getElementById('statSplitLegend-'+it.key);
+    if(legendEl)legendEl.innerHTML=
+      '<span><i style="background:#16A34A"></i>Compliant '+ok.toLocaleString()+'</span>'+
+      '<span><i style="background:#EF4444"></i>Missing '+missing.toLocaleString()+'</span>';
+    const canvas=document.getElementById('statSplitDonut-'+it.key);
+    if(!canvas)return;
+    if(!statSplitCharts[it.key]){
+      statSplitCharts[it.key]=new Chart(canvas,{
+        type:'doughnut',
+        data:{labels:['Compliant','Missing'],datasets:[{data:[ok,missing],backgroundColor:['#16A34A','#EF4444'],borderColor:'#fff',borderWidth:2}]},
+        options:{responsive:true,maintainAspectRatio:false,cutout:'70%',
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.raw.toLocaleString()}}}}
+      });
+    }else{
+      statSplitCharts[it.key].data.datasets[0].data=[ok,missing];
+      statSplitCharts[it.key].update();
+    }
+  });
 }
 
 function render(){
