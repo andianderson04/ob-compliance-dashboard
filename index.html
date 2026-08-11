@@ -1352,7 +1352,13 @@ const COLS = [
   {k:'sss',   label:'SSS',                 w:58,  comp:true},
   {k:'pag',   label:'Pag-IBIG',            w:72,  comp:true},
   {k:'ph',    label:'PhilHealth',          w:82,  comp:true},
-  {k:'cs',    label:'Compliance Status',   w:150, cs:true},
+  {k:'cs',    label:'Statutory Status',    w:150, cs:true},
+  {k:'req_peme',  label:'PEME Completion',      w:130, comp:true, hide:true},
+  {k:'req_nbi',   label:'NBI Clearance',        w:115, comp:true, hide:true},
+  {k:'req_job',   label:'Job Offer & Contract', w:155, comp:true, hide:true},
+  {k:'req_birth', label:'Birth Certificate',    w:135, comp:true, hide:true},
+  {k:'req_educ',  label:'Proof of Education',   w:145, comp:true, hide:true},
+  {k:'reqcs', label:'Requirements Status', w:150, reqcs:true},
   {k:'l1',    label:'L1 Manager',          w:200, hide:true},
   {k:'l2',    label:'L2 Dept. Manager',    w:210, hide:true},
   {k:'l3',    label:'L3 Division Head',    w:210, hide:true},
@@ -1661,7 +1667,7 @@ function applyStatutoryData(data){
     doj:r.date_of_joining,tin:r.tin,sss:r.sss,pag:r.pagibig,ph:r.philhealth,
     l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
   }))));
-  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);
+  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);annotateRequirementsStatus(all,reqAll);
   buildFilters();doFilter();
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
   badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();allEmpRefreshBase();
@@ -1674,7 +1680,7 @@ function applyRequirementsData(data){
     desig:r.designation||'',doj:r.date_of_joining||'',
     peme:r.peme,nbi:r.nbi,job:r.job_contract,birth:r.birth_cert,educ:r.proof_of_educ
   })));
-  badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
+  annotateRequirementsStatus(all,reqAll);badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
   buildReqFilters();reqDoFilter();
 }
 
@@ -1707,7 +1713,7 @@ async function init(){
   // 1. Load embedded immediately
   const json=await decompress(EMBEDDED_B64);
   allEmpFull=dedupeByEmployee(JSON.parse(json));
-  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);
+  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);annotateRequirementsStatus(all,reqAll);
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
@@ -1729,7 +1735,7 @@ async function init(){
 async function initReqs(){
   const json=await decompress(DOCS_B64);
   reqAll=JSON.parse(json);
-  badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
+  annotateRequirementsStatus(all,reqAll);badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
   document.getElementById('section-requirements').innerHTML=buildReqHTML();
   buildReqFilters(); reqDoFilter();
   animateNum(document.getElementById('reqDonutRate'));
@@ -2175,7 +2181,7 @@ function processFile(buffer,status){
       status.textContent='Processing\u2026 '+Math.round((i/json.length)*100)+'%';
       if(i<json.length){setTimeout(chunkProcess,0);return;}
       allEmpFull=[...byEmployee.values()];
-      all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);
+      all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);annotateRequirementsStatus(all,reqAll);
       const bankRecords=[...bankByEmployee.values()];
       window._lastUploadedBankMap=bankRecords;
       document.getElementById('hdr-count').textContent=all.length.toLocaleString();
@@ -2272,7 +2278,7 @@ function processReqFile(buffer,status){
         job:jobSet.has(e.id)?'Y':'X',birth:birthSet.has(e.id)?'Y':'X',educ:educSet.has(e.id)?'Y':'X'
       })));
       reqAll=records;
-      badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
+      annotateRequirementsStatus(all,reqAll);badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
       buildReqFilters();reqDoFilter();setAsOfDate(new Date());
       status.textContent='✓ Loaded '+records.length.toLocaleString()+' employees. Saving to database…';
       const reqRecords=records.map(r=>(({
@@ -2459,6 +2465,7 @@ function render(){
     const v=r[c.k]||'';
     if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'&#10003;':'&#10007;'}</span></td>`;}
     if(c.cs){const ok=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';return `<td class="comp-cell"><span class="comp-pill ${ok?'comp-ok':'comp-no'}">${ok?'COMPLETE':'INCOMPLETE'}</span></td>`;}
+    if(c.reqcs){const ok=r.req_peme==='Y'&&r.req_nbi==='Y'&&r.req_job==='Y'&&r.req_birth==='Y'&&r.req_educ==='Y';return `<td class="comp-cell"><span class="comp-pill ${ok?'comp-ok':'comp-no'}">${ok?'COMPLETE':'INCOMPLETE'}</span></td>`;}
     if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':v==='Off-Detailing'?'s-offdetailing':'s-other';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
     if(c.daysToMark){
       const val=r.daysToMark;
@@ -2556,6 +2563,22 @@ function annotateDaysToMark(records){
     r.daysToMark=td===null?null:(33-td);
   });
 }
+/* Stamps each statutory record with its Requirements status too (individual items + aggregate),
+   so the Statutory Numbers table and its export show both compliance domains side by side instead
+   of requiring a separate look at the Requirements tab. No requirements record on file counts as
+   missing for each item, consistent with how the HR Escalation check treats it. */
+function annotateRequirementsStatus(statRecords,reqRecords){
+  const reqLookup=new Map();
+  reqRecords.forEach(r=>reqLookup.set(r.id,r));
+  statRecords.forEach(r=>{
+    const req=reqLookup.get(r.id);
+    r.req_peme=req?req.peme:'X';
+    r.req_nbi=req?req.nbi:'X';
+    r.req_job=req?req.job:'X';
+    r.req_birth=req?req.birth:'X';
+    r.req_educ=req?req.educ:'X';
+  });
+}
 /* Combined compliance check for the HR Escalation process: incomplete if EITHER their statutory
    numbers (TIN/SSS/Pag-IBIG/PhilHealth) or their requirements (PEME/NBI/Job Contract/Birth Cert/
    Proof of Educ) have a gap. If someone has no requirements record at all, that counts as a
@@ -2577,6 +2600,7 @@ function exportXLSX(){
     const v=r[c.k]||'';
     if(c.comp)return v==='Y'?'✓':'✗';
     if(c.cs)return(r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')?'COMPLETE':'INCOMPLETE';
+    if(c.reqcs)return(r.req_peme==='Y'&&r.req_nbi==='Y'&&r.req_job==='Y'&&r.req_birth==='Y'&&r.req_educ==='Y')?'COMPLETE':'INCOMPLETE';
     if(c.daysToMark){
       const val=r.daysToMark;
       if(val===null||val===undefined)return '';
