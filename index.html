@@ -1347,6 +1347,7 @@ const COLS = [
   {k:'dept',  label:'Department',          w:165},
   {k:'sec',   label:'Section',             w:130, hide:true},
   {k:'doj',   label:'Date of Joining',     w:115, mono:true},
+  {k:'tenureDays', label:'Tenure (Days)', w:110, hide:true, mono:true, tenureDays:true},
   {k:'daysToMark', label:'Days to 33-Day Mark', w:150, hide:true, daysToMark:true},
   {k:'tin',   label:'TIN',                 w:58,  comp:true},
   {k:'sss',   label:'SSS',                 w:58,  comp:true},
@@ -2474,6 +2475,10 @@ function render(){
       else{text=Math.abs(val)+'d overdue';color='var(--danger)';}
       return `<td class="mono"><span style="color:${color};font-weight:600">${text}</span></td>`;
     }
+    if(c.tenureDays){
+      const val=r.tenureDays;
+      return `<td class="mono">${val===null||val===undefined?'&mdash;':val.toLocaleString()+'d'}</td>`;
+    }
     return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
   }).join('')}</tr>`).join('');
   document.getElementById('page-info').textContent=`${(s+1).toLocaleString()}–${e.toLocaleString()} of ${filtered.length.toLocaleString()} records`;
@@ -2558,6 +2563,7 @@ function annotateDaysToMark(records){
   const now=new Date();
   records.forEach(r=>{
     const td=tenureDaysAsOf(r.doj,now);
+    r.tenureDays=td;
     r.daysToMark=td===null?null:(33-td);
   });
 }
@@ -2602,6 +2608,10 @@ function exportXLSX(){
       const val=r.daysToMark;
       if(val===null||val===undefined)return '';
       return val>0?(val+' days left'):val===0?'Due today':(Math.abs(val)+' days overdue');
+    }
+    if(c.tenureDays){
+      const val=r.tenureDays;
+      return(val===null||val===undefined)?'':(val+' days');
     }
     return v;
   }));
