@@ -223,7 +223,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
 .kpi-item.kpi-click.sel::before{background:var(--blue);opacity:1}
 
 /* OVERVIEW: 5-CARD KPI ROW */
-.kpi5-strip{display:grid;grid-template-columns:1.7fr 1fr 1fr 1fr 1fr;gap:16px;padding:16px 24px 0;background:transparent}
+.kpi5-strip{display:grid;grid-template-columns:1.55fr 0.92fr 0.92fr 0.92fr 0.92fr 0.92fr;gap:14px;padding:16px 24px 0;background:transparent}
 .stat-card{padding:14px 16px;border:1px solid var(--rule-light);border-radius:14px;background:var(--surface);box-shadow:0 1px 2px rgba(15,23,42,.05),0 2px 6px rgba(15,23,42,.04)}
 .stat-card.clickable{cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .stat-card.clickable:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(67,56,202,.12)}
@@ -522,6 +522,11 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <div class="stat-card-val" id="ovNewHires-val">&mdash;</div>
         <div class="stat-card-sub" id="ovNewHires-sub">&mdash;</div>
       </div>
+      <div class="stat-card clickable" onclick="goFilter('statutory',{'f-comp':'escalate33'})" title="View employees ready to endorse to HR Operations (statutory or requirements incomplete). Note: rows here may show complete statutory numbers if their gap is in Requirements instead — check the Requirements tab for that detail.">
+        <div class="stat-card-head"><span class="stat-card-icon" style="background:#FEE2E2;color:#B91C1C"><svg viewBox="0 0 16 16" fill="none"><path d="M3 2v12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M3 2.8h8l-1.8 2.6L11 8H3" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span><span class="stat-card-label">HR Escalation (Day 26&ndash;40)</span></div>
+        <div class="stat-card-val" id="ovEscalate-val">&mdash;</div>
+        <div class="stat-card-sub" id="ovEscalate-sub">&mdash;</div>
+      </div>
     </div>
     <div class="chart-strip chart-strip-3">
       <div class="chart-panel">
@@ -638,6 +643,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <option value="pag">Pag-IBIG missing</option>
         <option value="ph">PhilHealth missing</option>
         <option value="newhire">New hires (&le;30 days)</option>
+        <option value="escalate33">HR escalation (day 26&ndash;40, statutory or requirements incomplete)</option>
       </select>
       <select class="filter-sel" id="f-compstatus" onchange="doFilter()">
         <option value="">All statuses</option>
@@ -1341,6 +1347,7 @@ const COLS = [
   {k:'dept',  label:'Department',          w:165},
   {k:'sec',   label:'Section',             w:130, hide:true},
   {k:'doj',   label:'Date of Joining',     w:115, mono:true},
+  {k:'daysToMark', label:'Days to 33-Day Mark', w:150, hide:true, daysToMark:true},
   {k:'tin',   label:'TIN',                 w:58,  comp:true},
   {k:'sss',   label:'SSS',                 w:58,  comp:true},
   {k:'pag',   label:'Pag-IBIG',            w:72,  comp:true},
@@ -1654,7 +1661,7 @@ function applyStatutoryData(data){
     doj:r.date_of_joining,tin:r.tin,sss:r.sss,pag:r.pagibig,ph:r.philhealth,
     l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
   }))));
-  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));
+  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);
   buildFilters();doFilter();
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
   badgesLoaded.stat=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();allEmpRefreshBase();
@@ -1667,7 +1674,7 @@ function applyRequirementsData(data){
     desig:r.designation||'',doj:r.date_of_joining||'',
     peme:r.peme,nbi:r.nbi,job:r.job_contract,birth:r.birth_cert,educ:r.proof_of_educ
   })));
-  badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();
+  badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
   buildReqFilters();reqDoFilter();
 }
 
@@ -1700,7 +1707,7 @@ async function init(){
   // 1. Load embedded immediately
   const json=await decompress(EMBEDDED_B64);
   allEmpFull=dedupeByEmployee(JSON.parse(json));
-  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));
+  all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('hdr-count').textContent=all.length.toLocaleString();
@@ -1722,7 +1729,7 @@ async function init(){
 async function initReqs(){
   const json=await decompress(DOCS_B64);
   reqAll=JSON.parse(json);
-  badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();
+  badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
   document.getElementById('section-requirements').innerHTML=buildReqHTML();
   buildReqFilters(); reqDoFilter();
   animateNum(document.getElementById('reqDonutRate'));
@@ -1973,15 +1980,24 @@ function renderOverviewKPICards(){
 
   // Card 5: New Hires (tenure <= 30 days)
   const now=new Date();
-  const msIn30Days=30*24*60*60*1000;
   const newHires=all.filter(r=>{
-    if(!r.doj)return false;
-    const d=new Date(r.doj);
-    if(isNaN(d.getTime()))return false;
-    const tenureMs=now-d;
-    return tenureMs>=0&&tenureMs<=msIn30Days;
+    const td=tenureDaysAsOf(r.doj,now);
+    return td!==null&&td>=0&&td<=30;
   }).length;
   setStatCard('ovNewHires',newHires.toLocaleString(),'Tenure of 30 days or less');
+
+  // Card 6: HR Escalation — a rolling window around the 33-day compliance deadline (26-40 days tenure:
+  // about a week approaching it, a short buffer after), not an open-ended 33+ count. This is a brand-new
+  // process, so anyone already well past the deadline when it launched is intentionally not swept in —
+  // only people currently entering or just past the window show up, and they drop off after day 40
+  // regardless of whether they got resolved, so the list never accumulates an old backlog.
+  const reqLookup=reqByCodeMap();
+  const escalateCount=all.filter(r=>{
+    const td=tenureDaysAsOf(r.doj,now);
+    if(td===null||td<26||td>40)return false;
+    return hasStatOrReqGap(r,reqLookup.get(r.id));
+  }).length;
+  setStatCard('ovEscalate',escalateCount.toLocaleString(),'Day 26\u201340 of tenure, statutory or requirements incomplete');
 }
 
 /* ── TAB SWITCHING ── */
@@ -2159,7 +2175,7 @@ function processFile(buffer,status){
       status.textContent='Processing\u2026 '+Math.round((i/json.length)*100)+'%';
       if(i<json.length){setTimeout(chunkProcess,0);return;}
       allEmpFull=[...byEmployee.values()];
-      all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));
+      all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);
       const bankRecords=[...bankByEmployee.values()];
       window._lastUploadedBankMap=bankRecords;
       document.getElementById('hdr-count').textContent=all.length.toLocaleString();
@@ -2256,7 +2272,7 @@ function processReqFile(buffer,status){
         job:jobSet.has(e.id)?'Y':'X',birth:birthSet.has(e.id)?'Y':'X',educ:educSet.has(e.id)?'Y':'X'
       })));
       reqAll=records;
-      badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();
+      badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
       buildReqFilters();reqDoFilter();setAsOfDate(new Date());
       status.textContent='✓ Loaded '+records.length.toLocaleString()+' employees. Saving to database…';
       const reqRecords=records.map(r=>(({
@@ -2373,6 +2389,7 @@ function doFilter(){
   const fes=document.getElementById('f-estat').value;
   const fc=document.getElementById('f-comp').value;
   const fcs=document.getElementById('f-compstatus').value;
+  const escalateLookup=fc==='escalate33'?reqByCodeMap():null;
   filtered=all.filter(r=>{
     if(q&&!(r.id+' '+r.name+' '+r.desig).toLowerCase().includes(q))return false;
     if(fe&&r.entity!==fe)return false;if(fd&&r.dept!==fd)return false;
@@ -2383,10 +2400,13 @@ function doFilter(){
     if(fc==='tin'&&r.tin!=='X')return false;if(fc==='sss'&&r.sss!=='X')return false;
     if(fc==='pag'&&r.pag!=='X')return false;if(fc==='ph'&&r.ph!=='X')return false;
     if(fc==='newhire'){
-      const d=new Date(r.doj);
-      if(isNaN(d.getTime()))return false;
-      const tenureMs=Date.now()-d.getTime();
-      if(tenureMs<0||tenureMs>30*24*60*60*1000)return false;
+      const td=tenureDaysAsOf(r.doj,new Date());
+      if(td===null||td<0||td>30)return false;
+    }
+    if(fc==='escalate33'){
+      const td=tenureDaysAsOf(r.doj,new Date());
+      if(td===null||td<26||td>40)return false;
+      if(!hasStatOrReqGap(r,escalateLookup.get(r.id)))return false;
     }
     if(fcs){const ok=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';
       if(fcs==='COMPLETE'&&!ok)return false;if(fcs==='INCOMPLETE'&&ok)return false;}
@@ -2440,6 +2460,15 @@ function render(){
     if(c.comp){const cls=v==='Y'?'tick tick-y':'tick tick-x';return `<td class="comp-cell"><span class="${cls}">${v==='Y'?'&#10003;':'&#10007;'}</span></td>`;}
     if(c.cs){const ok=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';return `<td class="comp-cell"><span class="comp-pill ${ok?'comp-ok':'comp-no'}">${ok?'COMPLETE':'INCOMPLETE'}</span></td>`;}
     if(c.status){const sc=v==='Active'?'s-active':v==='Off-Roster'?'s-offroster':v==='Off-Detailing'?'s-offdetailing':'s-other';return `<td><span class="status-pill ${sc}">${esc(v)}</span></td>`;}
+    if(c.daysToMark){
+      const val=r.daysToMark;
+      if(val===null||val===undefined)return `<td class="mono">&mdash;</td>`;
+      let text,color;
+      if(val>0){text=val+'d left';color='var(--ink-2)';}
+      else if(val===0){text='Due today';color='#B45309';}
+      else{text=Math.abs(val)+'d overdue';color='var(--danger)';}
+      return `<td class="mono"><span style="color:${color};font-weight:600">${text}</span></td>`;
+    }
     return `<td${c.mono?' class="mono"':''} title="${esc(v)}">${esc(v)}</td>`;
   }).join('')}</tr>`).join('');
   document.getElementById('page-info').textContent=`${(s+1).toLocaleString()}–${e.toLocaleString()} of ${filtered.length.toLocaleString()} records`;
@@ -2505,6 +2534,42 @@ function goFilter(tab,sets){
   if(fn)fn();
 }
 function jsAttr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+/* Calendar-day tenure, ignoring time-of-day, so a boundary like "exactly 40 days" is stable
+   no matter what time of day "now" happens to be — a raw millisecond difference can drift a
+   few hours past a whole-day boundary depending on execution time, which would incorrectly
+   include/exclude someone right at the edge of a tenure window. Returns null for an unparseable date. */
+function tenureDaysAsOf(dojStr,asOf){
+  if(!dojStr)return null;
+  const d=new Date(dojStr);
+  if(isNaN(d.getTime()))return null;
+  const a=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const b=new Date(asOf.getFullYear(),asOf.getMonth(),asOf.getDate());
+  return Math.round((b-a)/(24*60*60*1000));
+}
+/* Stamps each statutory record with how many days remain until (positive) or past (negative)
+   the 33-day HR Escalation mark, so it's a real sortable field, not just something computed
+   on the fly at render time. Recomputed fresh every time `all` is (re)built. */
+function annotateDaysToMark(records){
+  const now=new Date();
+  records.forEach(r=>{
+    const td=tenureDaysAsOf(r.doj,now);
+    r.daysToMark=td===null?null:(33-td);
+  });
+}
+/* Combined compliance check for the HR Escalation process: incomplete if EITHER their statutory
+   numbers (TIN/SSS/Pag-IBIG/PhilHealth) or their requirements (PEME/NBI/Job Contract/Birth Cert/
+   Proof of Educ) have a gap. If someone has no requirements record at all, that counts as a
+   requirements gap too — every tracked employee should have one on file. */
+function reqByCodeMap(){
+  const m=new Map();
+  reqAll.forEach(r=>m.set(r.id,r));
+  return m;
+}
+function hasStatOrReqGap(statRow,reqRow){
+  const statGap=statRow.tin==='X'||statRow.sss==='X'||statRow.pag==='X'||statRow.ph==='X';
+  const reqGap=!reqRow||reqRow.peme==='X'||reqRow.nbi==='X'||reqRow.job==='X'||reqRow.birth==='X'||reqRow.educ==='X';
+  return statGap||reqGap;
+}
 
 function exportXLSX(){
   const h=COLS.map(c=>c.label);
@@ -2512,6 +2577,11 @@ function exportXLSX(){
     const v=r[c.k]||'';
     if(c.comp)return v==='Y'?'✓':'✗';
     if(c.cs)return(r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y')?'COMPLETE':'INCOMPLETE';
+    if(c.daysToMark){
+      const val=r.daysToMark;
+      if(val===null||val===undefined)return '';
+      return val>0?(val+' days left'):val===0?'Due today':(Math.abs(val)+' days overdue');
+    }
     return v;
   }));
   const ws=XLSX.utils.aoa_to_sheet([h,...d]);
