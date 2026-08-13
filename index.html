@@ -1538,9 +1538,21 @@ async function supabaseLoad(table){
     return records.length>0?records:null;
   }catch(e){return null;}
 }
+/* Every request in supabaseSave goes through this so a single hung connection can't leave
+   the upload stuck indefinitely with no feedback — the same protection supabaseLoad already
+   had on the read side, which the save path was missing. */
+async function fetchWithTimeout(url,opts,timeoutMs=15000){
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    return await fetch(url,{...opts,signal:ctrl.signal});
+  }finally{
+    clearTimeout(t);
+  }
+}
 async function supabaseSave(table,records){
   try{
-    const delRes=await fetch(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':'return=minimal'}});
+    const delRes=await fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':'return=minimal'}});
     if(!delRes.ok){
       console.error(`supabaseSave: failed to clear ${table} before write (status ${delRes.status}) — aborting to avoid merging with stale rows.`);
       return false;
@@ -1551,15 +1563,15 @@ async function supabaseSave(table,records){
     const batches=[];
     for(let i=0;i<records.length;i+=500)batches.push(records.slice(i,i+500));
     const results=await Promise.all(batches.map(batch=>
-      fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify(batch)})
+      fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify(batch)})
         .then(res=>res.ok).catch(()=>false)
     ));
     if(results.some(ok=>!ok)){
       console.error(`supabaseSave: ${results.filter(ok=>!ok).length} of ${batches.length} batches failed writing to ${table} — the table may now hold only a partial dataset. Please retry the upload.`);
       return false;
     }
-    await fetch(`${SUPA_URL}/rest/v1/dashboard_meta?key=eq.last_updated_${table}`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':''}});
-    await fetch(`${SUPA_URL}/rest/v1/dashboard_meta`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify([{key:`last_updated_${table}`,value:new Date().toISOString()}])});
+    await fetchWithTimeout(`${SUPA_URL}/rest/v1/dashboard_meta?key=eq.last_updated_${table}`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':''}});
+    await fetchWithTimeout(`${SUPA_URL}/rest/v1/dashboard_meta`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify([{key:`last_updated_${table}`,value:new Date().toISOString()}])});
     return true;
   }catch(e){return false;}
 }
