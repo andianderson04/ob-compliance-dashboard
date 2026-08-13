@@ -2166,7 +2166,10 @@ function processFile(buffer,status){
           if(bankIdx!==undefined&&VALID_STATUSES.includes(obj.estat)){
             const bankRaw=String(row[bankIdx]||'').trim();
             const etypeNorm=(obj.etype||'').trim().toUpperCase();
-            if((bankRaw===''||bankRaw==='0')&&etypeNorm!=='SEASONAL'){
+            // Employees whose branch is flagged "(E)" are excluded from RCBC Payroll tracking entirely,
+            // regardless of their bank status — they're on a different payroll arrangement.
+            const branchExcluded=(obj.branch||'').includes('(E)');
+            if(!branchExcluded&&(bankRaw===''||bankRaw==='0')&&etypeNorm!=='SEASONAL'){
               bankByEmployee.set(ecode,{
                 id:obj.id,name:obj.name,email:obj.email,estat:obj.estat,etype:obj.etype,
                 branch:obj.branch,entity:obj.entity,dept:obj.dept,sec:obj.sec,doj:obj.doj,
