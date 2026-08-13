@@ -1545,9 +1545,18 @@ async function supabaseSave(table,records){
       console.error(`supabaseSave: failed to clear ${table} before write (status ${delRes.status}) — aborting to avoid merging with stale rows.`);
       return false;
     }
-    for(let i=0;i<records.length;i+=500){
-      const res=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify(records.slice(i,i+500))});
-      if(!res.ok)return false;
+    // Write every batch in parallel instead of one at a time — a large table used to mean dozens
+    // of sequential round-trips. Still all-or-nothing: if ANY batch fails, the whole save is reported
+    // as failed rather than silently leaving the database with only part of the new data written.
+    const batches=[];
+    for(let i=0;i<records.length;i+=500)batches.push(records.slice(i,i+500));
+    const results=await Promise.all(batches.map(batch=>
+      fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify(batch)})
+        .then(res=>res.ok).catch(()=>false)
+    ));
+    if(results.some(ok=>!ok)){
+      console.error(`supabaseSave: ${results.filter(ok=>!ok).length} of ${batches.length} batches failed writing to ${table} — the table may now hold only a partial dataset. Please retry the upload.`);
+      return false;
     }
     await fetch(`${SUPA_URL}/rest/v1/dashboard_meta?key=eq.last_updated_${table}`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':''}});
     await fetch(`${SUPA_URL}/rest/v1/dashboard_meta`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify([{key:`last_updated_${table}`,value:new Date().toISOString()}])});
@@ -2217,10 +2226,11 @@ function processFile(buffer,status){
         badgesLoaded.pay=true;updateTabBadges();renderOverviewKPICards();renderOverviewFocus();
         buildPayFilters();payDoFilter();
         if(statOk)maybeSaveTrendSnapshot().then(()=>loadAndRenderTrend());
-        status.className='upload-status ok';
-        status.textContent=(statOk&&payOk)
+        const bothOk=statOk&&payOk;
+        status.className=bothOk?'upload-status ok':'upload-status err';
+        status.textContent=bothOk
           ?'\u2713 '+all.length.toLocaleString()+' employees saved. Statutory + Payroll tabs updated.'
-          :'\u2713 Loaded locally but could not save to database.';
+          :'\u26a0 Loaded locally, but saving to the database failed — this browser shows correct data right now, but a page reload may not. Please retry the upload.';
       });
     }
     setTimeout(chunkProcess,0);
@@ -2291,10 +2301,10 @@ function processReqFile(buffer,status){
         peme:r.peme,nbi:r.nbi,job_contract:r.job,birth_cert:r.birth,proof_of_educ:r.educ
       })));
       supabaseSave('requirements_data',reqRecords).then(ok=>{
-        status.className='upload-status ok';
+        status.className=ok?'upload-status ok':'upload-status err';
         status.textContent=ok
           ?'✓ '+records.length.toLocaleString()+' employees saved. Requirements tab updated.'
-          :'✓ Loaded locally but could not save to database.';
+          :'⚠ Loaded locally, but saving to the database failed — this browser shows correct data right now, but a page reload may not. Please retry the upload.';
       });
     }
     setTimeout(chunkProcess,0);
