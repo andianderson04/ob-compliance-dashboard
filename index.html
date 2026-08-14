@@ -1512,7 +1512,11 @@ async function supabaseLoad(table,select='*'){
     if(first.total!=null&&first.total>records.length&&actualPageSize>0){
       const offsets=[];
       for(let off=actualPageSize;off<first.total;off+=actualPageSize)offsets.push(off);
-      const pages=await Promise.all(offsets.map(off=>fetchPage(off,REQUESTED_PAGE,false)));
+      // Capped concurrency, same reasoning as the save side: a table with tens of thousands of
+      // rows can mean 100+ pages, and firing all of them at once can overwhelm the database's
+      // connection pool rather than actually being faster.
+      const tasks=offsets.map(off=>()=>fetchPage(off,REQUESTED_PAGE,false));
+      const pages=await runWithConcurrencyLimit(tasks,6);
       for(const p of pages){
         if(!p)return null; // any page failing invalidates the whole load — never show partial data
         records=records.concat(p.batch);
@@ -1695,7 +1699,16 @@ function updateSyncProgress(){
 async function syncTable(key,table,applyFn,{withMeta=false}={}){
   syncInFlight++;updateSyncProgress();
   try{
-    const data=await supabaseLoad(table);
+    // Retries the whole read (not just a single page) up to 3 times before giving up — a
+    // transient hiccup anywhere in the read (a dropped connection, a momentary 500) used to mean
+    // immediately falling back to stale cached data and showing the "couldn't reach the database"
+    // banner. Most of the time a short retry resolves it without the person ever seeing that at all.
+    let data=null;
+    for(let attempt=1;attempt<=3;attempt++){
+      data=await supabaseLoad(table);
+      if(data&&data.length>0)break;
+      if(attempt<3)await new Promise(r=>setTimeout(r,800*attempt));
+    }
     if(data&&data.length>0){
       applyFn(data);
       syncState[key]=true;
