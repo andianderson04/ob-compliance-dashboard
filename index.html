@@ -1480,7 +1480,7 @@ const SUPA_HEADERS={
   'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,
   'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'
 };
-async function supabaseLoad(table){
+async function supabaseLoad(table,select='*'){
   const REQUESTED_PAGE=1000;
   const fetchPage=async(offset,limit,withCount)=>{
     const ctrl=new AbortController();
@@ -1488,7 +1488,7 @@ async function supabaseLoad(table){
     try{
       const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
       if(withCount)headers['Prefer']='count=exact';
-      const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*&limit=${limit}&offset=${offset}`,
+      const res=await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}&limit=${limit}&offset=${offset}`,
         {headers,signal:ctrl.signal});
       clearTimeout(t);
       if(!res.ok)return null;
@@ -1567,9 +1567,22 @@ async function runWithConcurrencyLimit(tasks,limit){
 }
 async function supabaseSave(table,records){
   try{
-    const delRes=await fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':'return=minimal'}});
+    // The clearing DELETE gets its own retry: a 500 here is often a transient server-side hiccup
+    // (a statement timeout under load, a momentary resource spike), and giving up on the very first
+    // attempt was too brittle for something the whole save depends on. Logs the actual response body
+    // too, not just the status code, so the real database-side reason is visible next time this fires.
+    let delRes=null,delBodyText='';
+    for(let attempt=1;attempt<=3;attempt++){
+      delRes=await fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':'return=minimal'}});
+      if(delRes.ok)break;
+      try{delBodyText=await delRes.text();}catch(e){delBodyText='(could not read response body)';}
+      if(attempt<3){
+        console.warn(`supabaseSave: clearing ${table} failed on attempt ${attempt}/3 (status ${delRes.status}) — ${delBodyText}. Retrying…`);
+        await new Promise(r=>setTimeout(r,1000*attempt));
+      }
+    }
     if(!delRes.ok){
-      console.error(`supabaseSave: failed to clear ${table} before write (status ${delRes.status}) — aborting to avoid merging with stale rows.`);
+      console.error(`supabaseSave: failed to clear ${table} before write after 3 attempts (status ${delRes.status}) — ${delBodyText} — aborting to avoid merging with stale rows.`);
       return false;
     }
     // Larger batches (fewer round-trips) with capped concurrency — enough at once to be fast,
@@ -1579,13 +1592,20 @@ async function supabaseSave(table,records){
     const BATCH_SIZE=1000,CONCURRENCY=6;
     const batches=[];
     for(let i=0;i<records.length;i+=BATCH_SIZE)batches.push(records.slice(i,i+BATCH_SIZE));
-    const tasks=batches.map(batch=>()=>
+    const tasks=batches.map((batch,idx)=>()=>
       fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify(batch)},20000)
-        .then(res=>res.ok).catch(()=>false)
+        .then(async res=>{
+          if(!res.ok){
+            let bodyText='';try{bodyText=await res.text();}catch(e){bodyText='(could not read response body)';}
+            console.warn(`supabaseSave: batch ${idx+1}/${batches.length} for ${table} failed (status ${res.status}) — ${bodyText}`);
+          }
+          return res.ok;
+        })
+        .catch(e=>{console.warn(`supabaseSave: batch ${idx+1}/${batches.length} for ${table} threw — ${e.message||e}`);return false;})
     );
     const results=await runWithConcurrencyLimit(tasks,CONCURRENCY);
     if(results.some(ok=>!ok)){
-      console.error(`supabaseSave: ${results.filter(ok=>!ok).length} of ${batches.length} batches failed writing to ${table} — the table may now hold only a partial dataset. Please retry the upload.`);
+      console.error(`supabaseSave: ${results.filter(ok=>!ok).length} of ${batches.length} batches failed writing to ${table} — the table may now hold only a partial dataset. Please retry the upload. See warnings above for the specific reason each batch failed.`);
       return false;
     }
     await fetchWithTimeout(`${SUPA_URL}/rest/v1/dashboard_meta?key=eq.last_updated_${table}`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':''}});
