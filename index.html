@@ -1550,6 +1550,21 @@ async function fetchWithTimeout(url,opts,timeoutMs=15000){
     clearTimeout(t);
   }
 }
+/* Runs a list of task functions with at most `limit` running at once, instead of either
+   fully sequential (slow) or fully unbounded parallel (which can overwhelm a database's
+   connection pool and end up just as slow, or trigger rate limiting). */
+async function runWithConcurrencyLimit(tasks,limit){
+  const results=new Array(tasks.length);
+  let next=0;
+  async function worker(){
+    while(next<tasks.length){
+      const i=next++;
+      results[i]=await tasks[i]();
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(limit,tasks.length)},worker));
+  return results;
+}
 async function supabaseSave(table,records){
   try{
     const delRes=await fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':'return=minimal'}});
@@ -1557,15 +1572,18 @@ async function supabaseSave(table,records){
       console.error(`supabaseSave: failed to clear ${table} before write (status ${delRes.status}) — aborting to avoid merging with stale rows.`);
       return false;
     }
-    // Write every batch in parallel instead of one at a time — a large table used to mean dozens
-    // of sequential round-trips. Still all-or-nothing: if ANY batch fails, the whole save is reported
-    // as failed rather than silently leaving the database with only part of the new data written.
+    // Larger batches (fewer round-trips) with capped concurrency — enough at once to be fast,
+    // not so many that we flood the database's connection pool and end up slow again anyway.
+    // Still all-or-nothing: if ANY batch fails, the whole save is reported as failed rather than
+    // silently leaving the database with only part of the new data written.
+    const BATCH_SIZE=1000,CONCURRENCY=6;
     const batches=[];
-    for(let i=0;i<records.length;i+=500)batches.push(records.slice(i,i+500));
-    const results=await Promise.all(batches.map(batch=>
-      fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify(batch)})
+    for(let i=0;i<records.length;i+=BATCH_SIZE)batches.push(records.slice(i,i+BATCH_SIZE));
+    const tasks=batches.map(batch=>()=>
+      fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:SUPA_HEADERS,body:JSON.stringify(batch)},20000)
         .then(res=>res.ok).catch(()=>false)
-    ));
+    );
+    const results=await runWithConcurrencyLimit(tasks,CONCURRENCY);
     if(results.some(ok=>!ok)){
       console.error(`supabaseSave: ${results.filter(ok=>!ok).length} of ${batches.length} batches failed writing to ${table} — the table may now hold only a partial dataset. Please retry the upload.`);
       return false;
