@@ -2221,26 +2221,50 @@ function handleFileUpload(file){
   reader.readAsBinaryString(file);
 }
 
-/* Wraps XLSX.read() + first-sheet access with a short retry. Parsing a large spreadsheet is
-   memory-intensive, and a transient browser resource hiccup can intermittently produce a workbook
-   with no accessible sheet — a brief pause and retry often clears it without the person needing to
-   manually re-upload. Always throws a descriptive error rather than failing silently, including
-   which sheet names (if any) were actually found, so a persistent failure is easier to diagnose. */
+/* Wraps XLSX.read() + sheet access with real fallback strategies, not just blind repetition.
+   A workbook can report a sheet name in SheetNames while still failing a Sheets[name] lookup —
+   e.g. from a subtle key mismatch, or a parse-mode quirk with a particular sheet's structure.
+   Each attempt tries multiple genuinely different ways to reach the data, and later attempts
+   also vary the parse options themselves (dropping "dense" mode, a more specialized format
+   that can behave differently on certain sheets) — so a persistent, reproducible failure has
+   real alternate paths to succeed through, not just the same operation repeated and hoped for.
+   Always throws a descriptive error rather than failing silently, including which sheet names
+   (if any) were actually found, so a persistent failure is easier to diagnose. */
 async function parseWorkbookFirstSheet(buffer,xlsxOpts,maxAttempts=3){
   let lastSheetNames=null;
+  function tryExtract(wb){
+    if(!wb||!wb.SheetNames||!wb.SheetNames.length)return null;
+    lastSheetNames=wb.SheetNames;
+    // Strategy 1: the standard way — first entry in SheetNames, looked up in Sheets.
+    let ws=wb.Sheets[wb.SheetNames[0]];
+    if(ws)return ws;
+    // Strategy 2: use the Sheets object's own keys directly — covers a subtle mismatch
+    // between a SheetNames entry and the actual key used in the Sheets object itself.
+    const sheetKeys=Object.keys(wb.Sheets);
+    if(sheetKeys.length){
+      ws=wb.Sheets[sheetKeys[0]];
+      if(ws)return ws;
+    }
+    // Strategy 3: try every named sheet, not just the first, in case a later sheet
+    // in the same workbook is actually the readable one.
+    for(const name of wb.SheetNames){
+      if(wb.Sheets[name])return wb.Sheets[name];
+    }
+    return null;
+  }
   for(let attempt=1;attempt<=maxAttempts;attempt++){
     try{
-      const wb=XLSX.read(buffer,xlsxOpts);
-      const ws=wb.Sheets[wb.SheetNames[0]];
+      const opts=attempt===1?xlsxOpts:{...xlsxOpts,dense:false};
+      const wb=XLSX.read(buffer,opts);
+      const ws=tryExtract(wb);
       if(ws)return ws;
-      lastSheetNames=wb.SheetNames;
     }catch(e){
       lastSheetNames=null;
     }
     if(attempt<maxAttempts)await new Promise(r=>setTimeout(r,400*attempt));
   }
   const detail=lastSheetNames&&lastSheetNames.length
-    ?`Sheet names found: ${lastSheetNames.join(', ')}, but none were readable.`
+    ?`Sheet names found: ${lastSheetNames.join(', ')}, but none were readable even after trying alternate access methods and parse modes.`
     :'No sheet names could be read from the file.';
   throw new Error(`Could not read sheet after ${maxAttempts} attempts. ${detail}`);
 }
