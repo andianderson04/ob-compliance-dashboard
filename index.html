@@ -2205,20 +2205,29 @@ function handleFileUpload(file){
     status.textContent='An upload is already saving to the database — please wait for it to finish (watch for the final ✓ or ⚠ message) before starting another. Starting a second one too soon can let them overwrite each other.';
     return;
   }
+  // Files this large are very likely to fail to parse in the browser — not from a bug in this
+  // dashboard, but because the export itself is unusually large for what it actually contains
+  // (commonly: the export tool writing every cell's text inline instead of using a shared-text
+  // table, which for a large row count can inflate the underlying data by 10x or more). Warn
+  // immediately rather than let it silently churn for a while before failing.
+  const sizeMB=file.size/(1024*1024);
+  if(sizeMB>20){
+    status.className='upload-status err';
+    status.textContent=`Heads up: this file is ${sizeMB.toFixed(0)}MB, which is unusually large for this kind of export and is likely to fail to parse in the browser. Attempting it anyway, but if it fails, the file itself likely needs attention — ask whoever generates this export whether it can use a shared strings table instead of inline text for each cell, which for a large row count typically shrinks the file dramatically.`;
+  }
   uploadInFlight=true;
   // Safety valve: if something deep in the chunked processing throws without ever reaching a
   // normal completion path, the lock could otherwise stay stuck forever. A generous timeout
   // guarantees uploading is never permanently blocked, even by a bug we haven't seen yet.
   setTimeout(()=>{uploadInFlight=false;},180000);
-  status.className='upload-status';
-  status.textContent='Reading file… (large files may take 15–30 seconds)';
+  if(sizeMB<=20){status.className='upload-status';status.textContent='Reading file… (large files may take 15–30 seconds)';}
   const reader=new FileReader();
   if(modalUploadType==='requirements'){
     reader.onload=e=>setTimeout(()=>processReqFile(e.target.result,status),50);
   }else{
     reader.onload=e=>setTimeout(()=>processFile(e.target.result,status),50);
   }
-  reader.readAsBinaryString(file);
+  reader.readAsArrayBuffer(file);
 }
 
 /* Wraps XLSX.read() + sheet access with real fallback strategies, not just blind repetition.
@@ -2255,7 +2264,10 @@ async function parseWorkbookFirstSheet(buffer,xlsxOpts,maxAttempts=3){
   for(let attempt=1;attempt<=maxAttempts;attempt++){
     try{
       const opts=attempt===1?xlsxOpts:{...xlsxOpts,dense:false};
-      const wb=XLSX.read(buffer,opts);
+      // Uint8Array is the most universally-compatible way to hand ArrayBuffer data to SheetJS's
+      // 'array' type across versions, rather than relying on it accepting a raw ArrayBuffer directly.
+      const input=(opts.type==='array'&&buffer instanceof ArrayBuffer)?new Uint8Array(buffer):buffer;
+      const wb=XLSX.read(input,opts);
       const ws=tryExtract(wb);
       if(ws)return ws;
     }catch(e){
@@ -2273,7 +2285,7 @@ async function processFile(buffer,status){
     status.textContent='Parsing spreadsheet\u2026';
     let ws;
     try{
-      ws=await parseWorkbookFirstSheet(buffer,{type:'binary',cellDates:true,dense:true});
+      ws=await parseWorkbookFirstSheet(buffer,{type:'array',cellDates:true,dense:true});
     }catch(parseErr){
       uploadInFlight=false;status.className='upload-status err';status.textContent=parseErr.message;return;
     }
@@ -2387,7 +2399,7 @@ async function processReqFile(buffer,status){
     status.textContent='Parsing requirements file (may take up to 30 seconds)\u2026';
     let ws;
     try{
-      ws=await parseWorkbookFirstSheet(buffer,{type:'binary',raw:false,cellDates:false});
+      ws=await parseWorkbookFirstSheet(buffer,{type:'array',raw:false,cellDates:false});
     }catch(parseErr){
       uploadInFlight=false;status.className='upload-status err';status.textContent=parseErr.message;return;
     }
