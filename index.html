@@ -1461,6 +1461,12 @@ async function loadAndRenderTrend(){
 }
 
 let currentTab='overview', modalUploadType='statutory';
+// Guards against two uploads overlapping — e.g. someone starting a second upload before the
+// first one's save (including its automatic retries, which can take up to ~30-45s) has actually
+// finished. Without this, two overlapping delete-then-insert cycles could race, and whichever
+// happens to finish last "wins" — silently overwriting a good, complete save with a stale or
+// partial one from the earlier attempt, minutes after the first upload looked successful.
+let uploadInFlight=false;
 let statDonutChart=null, statBarChart=null, reqDonutChart=null, reqBarChart=null;
 let statSplitCharts={};
 
@@ -2194,6 +2200,16 @@ function handleDrop(e){
 function handleFileUpload(file){
   if(!file)return;
   const status=document.getElementById('upload-status');
+  if(uploadInFlight){
+    status.className='upload-status err';
+    status.textContent='An upload is already saving to the database — please wait for it to finish (watch for the final ✓ or ⚠ message) before starting another. Starting a second one too soon can let them overwrite each other.';
+    return;
+  }
+  uploadInFlight=true;
+  // Safety valve: if something deep in the chunked processing throws without ever reaching a
+  // normal completion path, the lock could otherwise stay stuck forever. A generous timeout
+  // guarantees uploading is never permanently blocked, even by a bug we haven't seen yet.
+  setTimeout(()=>{uploadInFlight=false;},180000);
   status.className='upload-status';
   status.textContent='Reading file… (large files may take 15–30 seconds)';
   const reader=new FileReader();
@@ -2235,14 +2251,14 @@ async function processFile(buffer,status){
     try{
       ws=await parseWorkbookFirstSheet(buffer,{type:'binary',cellDates:true,dense:true});
     }catch(parseErr){
-      status.className='upload-status err';status.textContent=parseErr.message;return;
+      uploadInFlight=false;status.className='upload-status err';status.textContent=parseErr.message;return;
     }
     const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-    if(!json||json.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    if(!json||json.length<2){uploadInFlight=false;status.className='upload-status err';status.textContent='File appears empty.';return;}
     const headers=json[0].map(h=>String(h||'').trim());
     const required=['EMPLOYEECODE','EMPLOYMENT STATUS','TIN','SSS NUMBER','PAGIBIG NUMBER','PHILHEALTH NUMBER'];
     const missing=required.filter(col=>!headers.includes(col));
-    if(missing.length){status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
+    if(missing.length){uploadInFlight=false;status.className='upload-status err';status.textContent='Missing columns: '+missing.join(', ');return;}
     const ci={};headers.forEach((h,i)=>{ci[h]=i;});
     const statIdx=ci['EMPLOYMENT STATUS'],ecodeIdx=ci['EMPLOYEECODE'],bankIdx=ci['BANKNAME'];
     status.textContent='Processing\u2026 0%';
@@ -2330,11 +2346,13 @@ async function processFile(buffer,status){
         status.textContent=bothOk
           ?'\u2713 '+all.length.toLocaleString()+' employees saved. Statutory + Payroll tabs updated.'
           :'\u26a0 Loaded locally, but saving to the database failed — this browser shows correct data right now, but a page reload may not. Please retry the upload.';
+        uploadInFlight=false;
       });
     }
     setTimeout(chunkProcess,0);
   }catch(err){
     console.error(err);
+    uploadInFlight=false;
     status.className='upload-status err';
     status.textContent='Error: '+err.message;
   }
@@ -2347,10 +2365,10 @@ async function processReqFile(buffer,status){
     try{
       ws=await parseWorkbookFirstSheet(buffer,{type:'binary',raw:false,cellDates:false});
     }catch(parseErr){
-      status.className='upload-status err';status.textContent=parseErr.message;return;
+      uploadInFlight=false;status.className='upload-status err';status.textContent=parseErr.message;return;
     }
     const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-    if(rawRows.length<2){status.className='upload-status err';status.textContent='File appears empty.';return;}
+    if(rawRows.length<2){uploadInFlight=false;status.className='upload-status err';status.textContent='File appears empty.';return;}
     const headers=rawRows[0].map(h=>String(h||'').trim());
     const ci={};headers.forEach((h,idx)=>ci[h]=idx);
     const PEME_S=new Set(PEME_TYPES),NBI_S=new Set(NBI_TYPES),JOB_S=new Set(JOB_TYPES),BIRTH_S=new Set(BIRTH_TYPES),EDUC_S=new Set(EDUC_TYPES);
@@ -2406,10 +2424,11 @@ async function processReqFile(buffer,status){
         status.textContent=ok
           ?'✓ '+records.length.toLocaleString()+' employees saved. Requirements tab updated.'
           :'⚠ Loaded locally, but saving to the database failed — this browser shows correct data right now, but a page reload may not. Please retry the upload.';
+        uploadInFlight=false;
       });
     }
     setTimeout(chunkProcess,0);
-  }catch(err){status.className='upload-status err';status.textContent='Could not read file.';}
+  }catch(err){uploadInFlight=false;status.className='upload-status err';status.textContent='Could not read file.';}
 }
 
 /* ── FILTERS ── */
