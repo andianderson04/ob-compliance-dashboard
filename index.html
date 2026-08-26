@@ -1364,6 +1364,7 @@ const COLS = [
   {k:'l1',    label:'L1 Manager',          w:200, hide:true},
   {k:'l2',    label:'L2 Dept. Manager',    w:210, hide:true},
   {k:'l3',    label:'L3 Division Head',    w:210, hide:true},
+  {k:'hrmgr', label:'HR Manager',          w:200, hide:true},
 ];
 
 const REQ_COLS = [
@@ -1383,6 +1384,7 @@ const REQ_COLS = [
   {k:'birth', label:'Birth Certificate',   w:135, comp:true, thCls:'req-s'},
   {k:'educ',  label:'Proof of Education',  w:145, comp:true, thCls:'req-s'},
   {k:'rcs',   label:'Compliance Status',   w:150, rcs:true},
+  {k:'hrmgr', label:'HR Manager',          w:200, hide:true},
 ];
 
 const PAY_COLS = [
@@ -1408,7 +1410,7 @@ const KEY_MAP = {
   'Branch':'branch','Entity':'entity','Department':'dept','Section':'sec',
   'INTERNAL ORDER':'intOrder','DATE OF JOINING':'doj','TIN':'tin','SSS NUMBER':'sss','PAGIBIG NUMBER':'pag',
   'PHILHEALTH NUMBER':'ph','L1 MANAGER NAME':'l1','L2 DEPARTMENT MANAGER NAME':'l2',
-  'L3 DIVISION HEAD NAME':'l3'
+  'L3 DIVISION HEAD NAME':'l3','HR MANAGER NAME':'hrmgr'
 };
 const COMP_COLS=['TIN','SSS NUMBER','PAGIBIG NUMBER','PHILHEALTH NUMBER'];
 const VALID_STATUSES=['Active','Off-Roster','Off-Detailing'];
@@ -1745,7 +1747,7 @@ function applyStatutoryData(data){
     estat:r.employment_status,etype:r.employment_type,desig:r.designation,
     branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,intOrder:r.internal_order,
     doj:r.date_of_joining,tin:r.tin,sss:r.sss,pag:r.pagibig,ph:r.philhealth,
-    l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager
+    l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager,hrmgr:r.hr_manager
   }))));
   all=allEmpFull.filter(r=>VALID_STATUSES.includes(r.estat));annotateDaysToMark(all);annotateRequirementsStatus(all,reqAll);
   buildFilters();doFilter();
@@ -1757,7 +1759,7 @@ function applyRequirementsData(data){
   reqAll=data.map(r=>(({
     id:r.employee_code,name:r.employee_name,email:r.email||'',estat:r.employment_status,
     entity:r.entity,branch:r.branch,dept:r.department,sec:r.section,
-    desig:r.designation||'',doj:r.date_of_joining||'',
+    desig:r.designation||'',doj:r.date_of_joining||'',hrmgr:r.hr_manager||'',
     peme:r.peme,nbi:r.nbi,job:r.job_contract,birth:r.birth_cert,educ:r.proof_of_educ
   })));
   annotateRequirementsStatus(all,reqAll);badgesLoaded.req=true;updateTabBadges();renderOverviewFocus();renderOverviewKPICards();
@@ -2354,7 +2356,7 @@ async function processFile(buffer,status){
         employment_status:r.estat,employment_type:r.etype,designation:r.desig,
         branch:r.branch,entity:r.entity,department:r.dept,section:r.sec,internal_order:r.intOrder,
         date_of_joining:r.doj,tin:r.tin,sss:r.sss,pagibig:r.pag,philhealth:r.ph,
-        l1_manager:r.l1,l2_manager:r.l2,l3_manager:r.l3
+        l1_manager:r.l1,l2_manager:r.l2,l3_manager:r.l3,hr_manager:r.hrmgr
       }));
       const noBankRecords=(window._lastUploadedBankMap||[]).filter(r=>r.bankMissing).map(r=>({
         employee_code:r.id,employee_name:r.name,email:r.email,
@@ -2430,16 +2432,17 @@ async function processReqFile(buffer,status){
       }
       status.textContent='Processing… '+Math.round((i/rawRows.length)*100)+'%';
       if(i<rawRows.length){setTimeout(chunkProcess,0);return;}
-      const branchLkp={},emailLkp={},desigLkp={},dojLkp={};
+      const branchLkp={},emailLkp={},desigLkp={},dojLkp={},hrmgrLkp={};
       all.forEach(r=>{
         if(r.id&&r.branch)branchLkp[r.id]=r.branch;
         if(r.id&&r.email)emailLkp[r.id]=r.email;
         if(r.id&&r.desig)desigLkp[r.id]=r.desig;
         if(r.id&&r.doj)dojLkp[r.id]=r.doj;
+        if(r.id&&r.hrmgr)hrmgrLkp[r.id]=r.hrmgr;
       });
       const records=Object.values(empInfo).map(e=>(({
         ...e,branch:branchLkp[e.id]||'',email:emailLkp[e.id]||'',
-        desig:desigLkp[e.id]||'',doj:dojLkp[e.id]||'',
+        desig:desigLkp[e.id]||'',doj:dojLkp[e.id]||'',hrmgr:hrmgrLkp[e.id]||'',
         peme:pemeSet.has(e.id)?'Y':'X',nbi:nbiSet.has(e.id)?'Y':'X',
         job:jobSet.has(e.id)?'Y':'X',birth:birthSet.has(e.id)?'Y':'X',educ:educSet.has(e.id)?'Y':'X'
       })));
@@ -2450,7 +2453,7 @@ async function processReqFile(buffer,status){
       const reqRecords=records.map(r=>(({
         employee_code:r.id,employee_name:r.name,email:r.email,employment_status:r.estat,
         entity:r.entity,branch:r.branch,department:r.dept,section:r.sec,
-        designation:r.desig,date_of_joining:r.doj,
+        designation:r.desig,date_of_joining:r.doj,hr_manager:r.hrmgr,
         peme:r.peme,nbi:r.nbi,job_contract:r.job,birth_cert:r.birth,proof_of_educ:r.educ
       })));
       supabaseSave('requirements_data',reqRecords).then(ok=>{
@@ -2802,7 +2805,7 @@ function exportConsolidated(){
     'TIN','SSS','Pag-IBIG','PhilHealth',
     'PEME Completion','NBI Clearance','Job Offer & Contract','Birth Certificate','Proof of Education',
     'Compliance Status',
-    'L1 Manager','L2 Dept. Manager','L3 Division Head'
+    'L1 Manager','L2 Dept. Manager','L3 Division Head','HR Manager'
   ];
 
   const rows=all.map(r=>{
@@ -2817,7 +2820,7 @@ function exportConsolidated(){
       tick(r.tin),tick(r.sss),tick(r.pag),tick(r.ph),
       hasReq?tick(req.peme):'N/A',hasReq?tick(req.nbi):'N/A',hasReq?tick(req.job):'N/A',hasReq?tick(req.birth):'N/A',hasReq?tick(req.educ):'N/A',
       complianceStatus,
-      r.l1,r.l2,r.l3
+      r.l1,r.l2,r.l3,r.hrmgr
     ];
   });
 
