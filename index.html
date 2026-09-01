@@ -1539,13 +1539,33 @@ async function supabaseLoad(table,select='*'){
         return null;
       }
     }else if(first.total==null&&first.batch.length===REQUESTED_PAGE){
-      // Fallback if the server didn't report a count for some reason — walk sequentially.
+      // Fallback if the server didn't report a count for some reason. This path previously had
+      // no way to tell a genuine end-of-data from a transient short response — a batch smaller
+      // than requested was trusted as definitive, with nothing to verify it against (unlike the
+      // primary path above, which checks the assembled count against the server's own total).
+      // Now it confirms a short batch really is the end by explicitly requesting the next offset
+      // too, rather than accepting the short batch on faith.
+      console.warn(`supabaseLoad: "${table}" did not return a Content-Range count header — using the less-verified sequential fallback path.`);
       let offset=REQUESTED_PAGE;
       while(true){
         const p=await fetchPage(offset,REQUESTED_PAGE,false);
         if(!p)return null;
         records=records.concat(p.batch);
-        if(p.batch.length<REQUESTED_PAGE)break;
+        if(p.batch.length<REQUESTED_PAGE){
+          // Confirm this is genuinely the end, not a one-off short response — a real end-of-data
+          // page is followed by a truly empty page; anything else means more data was missed.
+          const confirmOffset=offset+p.batch.length;
+          const confirm=await fetchPage(confirmOffset,REQUESTED_PAGE,false);
+          if(!confirm)return null;
+          if(confirm.batch.length>0){
+            console.warn(`supabaseLoad: a short batch at offset ${offset} for "${table}" was NOT actually the end — found ${confirm.batch.length} more rows at offset ${confirmOffset}. Continuing rather than stopping early.`);
+            records=records.concat(confirm.batch);
+            if(confirm.batch.length<REQUESTED_PAGE)break;
+            offset=confirmOffset+confirm.batch.length;
+            continue;
+          }
+          break;
+        }
         offset+=REQUESTED_PAGE;
       }
     }
@@ -1581,17 +1601,24 @@ async function runWithConcurrencyLimit(tasks,limit){
 }
 async function supabaseSave(table,records){
   try{
-    // The clearing DELETE gets its own retry: a 500 here is often a transient server-side hiccup
-    // (a statement timeout under load, a momentary resource spike), and giving up on the very first
-    // attempt was too brittle for something the whole save depends on. Logs the actual response body
-    // too, not just the status code, so the real database-side reason is visible next time this fires.
+    // Clearing the table now goes through a TRUNCATE-based database function instead of a
+    // row-by-row DELETE. Confirmed directly (via a real console error: "canceling statement due
+    // to statement timeout") that DELETE was hitting Postgres's own statement timeout as the
+    // table grew past ~117,000 rows, causing saves to intermittently fail or get cut short
+    // mid-retry. TRUNCATE clears an entire table almost instantly regardless of row count, since
+    // it deallocates the table's data directly rather than processing rows one at a time.
+    const truncateFn={'statutory_data':'truncate_statutory_data','requirements_data':'truncate_requirements_data','payroll_data':'truncate_payroll_data'}[table];
+    if(!truncateFn){
+      console.error(`supabaseSave: no truncate function mapped for table "${table}" — add one before calling this for a new table.`);
+      return false;
+    }
     let delRes=null,delBodyText='';
     for(let attempt=1;attempt<=3;attempt++){
-      delRes=await fetchWithTimeout(`${SUPA_URL}/rest/v1/${table}?employee_code=neq.ZZZZZZ`,{method:'DELETE',headers:{...SUPA_HEADERS,'Prefer':'return=minimal'}});
+      delRes=await fetchWithTimeout(`${SUPA_URL}/rest/v1/rpc/${truncateFn}`,{method:'POST',headers:{...SUPA_HEADERS,'Prefer':'return=minimal'},body:'{}'});
       if(delRes.ok)break;
       try{delBodyText=await delRes.text();}catch(e){delBodyText='(could not read response body)';}
       if(attempt<3){
-        console.warn(`supabaseSave: clearing ${table} failed on attempt ${attempt}/3 (status ${delRes.status}) — ${delBodyText}. Retrying…`);
+        console.warn(`supabaseSave: clearing ${table} (via ${truncateFn}) failed on attempt ${attempt}/3 (status ${delRes.status}) — ${delBodyText}. Retrying…`);
         await new Promise(r=>setTimeout(r,1000*attempt));
       }
     }
