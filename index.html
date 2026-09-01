@@ -3362,6 +3362,17 @@ function exportAllEmpXLSX(){
 const CURRENT_VERSION='20260701121327';
 async function checkForUpdate(){
   try{
+    if(uploadInFlight){
+      // Never reload while an upload is actively saving — a page reload kills whatever JS was
+      // still running, including a save mid-write to the database. That's the exact mechanism
+      // behind the "looked correct, then wrong a couple minutes later, no error shown" pattern:
+      // the reload doesn't corrupt anything visibly, it just faithfully shows whatever partial
+      // amount of data actually made it into the database before the reload cut the save short.
+      // Check again shortly instead of waiting out the full interval, so the update still lands
+      // promptly once the upload actually finishes.
+      setTimeout(checkForUpdate,10000);
+      return;
+    }
     const res=await fetch(window.location.href.split('?')[0]+'?_='+Date.now(),{cache:'no-store'});
     const html=await res.text();
     const match=html.match(/<meta name="dashboard-version" content="(\d+)">/);
