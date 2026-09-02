@@ -524,8 +524,8 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <div class="stat-card-val" id="ovNewHires-val">&mdash;</div>
         <div class="stat-card-sub" id="ovNewHires-sub">&mdash;</div>
       </div>
-      <div class="stat-card clickable" onclick="goFilter('statutory',{'f-comp':'escalate33'})" title="View employees ready to endorse to HR Operations (statutory or requirements incomplete). Note: rows here may show complete statutory numbers if their gap is in Requirements instead — check the Requirements tab for that detail.">
-        <div class="stat-card-head"><span class="stat-card-icon" style="background:#FEE2E2;color:#B91C1C"><svg viewBox="0 0 16 16" fill="none"><path d="M3 2v12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M3 2.8h8l-1.8 2.6L11 8H3" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span><span class="stat-card-label">HR Escalation (Day 26&ndash;40)</span></div>
+      <div class="stat-card clickable" onclick="goFilter('statutory',{'f-comp':'escalate33'})" title="Employees hitting exactly day 33 of tenure today, still incomplete (statutory or requirements) — a fresh daily snapshot, not carried over from previous days. Note: rows here may show complete statutory numbers if their gap is in Requirements instead — check the Requirements tab for that detail.">
+        <div class="stat-card-head"><span class="stat-card-icon" style="background:#FEE2E2;color:#B91C1C"><svg viewBox="0 0 16 16" fill="none"><path d="M3 2v12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M3 2.8h8l-1.8 2.6L11 8H3" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></span><span class="stat-card-label">HR Escalation (Hit Day 33)</span></div>
         <div class="stat-card-val" id="ovEscalate-val">&mdash;</div>
         <div class="stat-card-sub" id="ovEscalate-sub">&mdash;</div>
       </div>
@@ -645,7 +645,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <option value="pag">Pag-IBIG missing</option>
         <option value="ph">PhilHealth missing</option>
         <option value="newhire">New hires (&le;30 days)</option>
-        <option value="escalate33">HR escalation (day 26&ndash;40, statutory or requirements incomplete)</option>
+        <option value="escalate33">HR escalation (hit day 33 today, incomplete)</option>
       </select>
       <select class="filter-sel" id="f-compstatus" onchange="doFilter()">
         <option value="">All statuses</option>
@@ -2109,18 +2109,17 @@ function renderOverviewKPICards(){
   }).length;
   setStatCard('ovNewHires',newHires.toLocaleString(),'Tenure of 30 days or less');
 
-  // Card 6: HR Escalation — a rolling window around the 33-day compliance deadline (26-40 days tenure:
-  // about a week approaching it, a short buffer after), not an open-ended 33+ count. This is a brand-new
-  // process, so anyone already well past the deadline when it launched is intentionally not swept in —
-  // only people currently entering or just past the window show up, and they drop off after day 40
-  // regardless of whether they got resolved, so the list never accumulates an old backlog.
+  // Card 6: HR Escalation — a daily snapshot of exactly who turns 33 days of tenure today, not an
+  // ongoing "still unresolved" list. Someone who hit 33 yesterday and is still incomplete should NOT
+  // reappear today — that's a different day's report entirely, by design: each day's list is meant
+  // to be its own distinct set of people, handed to HR Ops once and not carried forward.
   const reqLookup=reqByCodeMap();
   const escalateCount=all.filter(r=>{
     const td=tenureDaysAsOf(r.doj,now);
-    if(td===null||td<26||td>40)return false;
+    if(td!==33)return false;
     return hasStatOrReqGap(r,reqLookup.get(r.id));
   }).length;
-  setStatCard('ovEscalate',escalateCount.toLocaleString(),'Day 26\u201340 of tenure, statutory or requirements incomplete');
+  setStatCard('ovEscalate',escalateCount.toLocaleString(),'Hit day 33 of tenure today, statutory or requirements incomplete');
 }
 
 /* ── TAB SWITCHING ── */
@@ -2608,7 +2607,7 @@ function doFilter(){
     }
     if(fc==='escalate33'){
       const td=tenureDaysAsOf(r.doj,new Date());
-      if(td===null||td<26||td>40)return false;
+      if(td!==33)return false;
       if(!hasStatOrReqGap(r,escalateLookup.get(r.id)))return false;
     }
     if(fcs){const ok=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y'&&r.req_peme==='Y'&&r.req_nbi==='Y'&&r.req_job==='Y'&&r.req_birth==='Y'&&r.req_educ==='Y';
