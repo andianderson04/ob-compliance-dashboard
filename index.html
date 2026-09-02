@@ -1348,6 +1348,7 @@ const COLS = [
   {k:'entity',label:'Entity',              w:220, hide:true},
   {k:'dept',  label:'Department',          w:165},
   {k:'sec',   label:'Section',             w:130, hide:true},
+  {k:'subsec',label:'Sub-Section',         w:150, hide:true},
   {k:'doj',   label:'Date of Joining',     w:115, mono:true},
   {k:'tenureDays', label:'Tenure (Days)', w:110, hide:true, mono:true, tenureDays:true},
   {k:'daysToMark', label:'Days to 33-Day Mark', w:150, hide:true, daysToMark:true},
@@ -1376,6 +1377,7 @@ const REQ_COLS = [
   {k:'branch',label:'Branch',              w:100},
   {k:'dept',  label:'Department',          w:165},
   {k:'sec',   label:'Section',             w:130},
+  {k:'subsec',label:'Sub-Section',         w:150, hide:true},
   {k:'desig', label:'Designation',         w:200},
   {k:'doj',   label:'Date of Joining',     w:115, mono:true},
   {k:'peme',  label:'PEME Completion',     w:130, comp:true, thCls:'req-p'},
@@ -1410,7 +1412,7 @@ const KEY_MAP = {
   'Branch':'branch','Entity':'entity','Department':'dept','Section':'sec',
   'INTERNAL ORDER':'intOrder','DATE OF JOINING':'doj','TIN':'tin','SSS NUMBER':'sss','PAGIBIG NUMBER':'pag',
   'PHILHEALTH NUMBER':'ph','L1 MANAGER NAME':'l1','L2 DEPARTMENT MANAGER NAME':'l2',
-  'L3 DIVISION HEAD NAME':'l3','HR MANAGER NAME':'hrmgr'
+  'L3 DIVISION HEAD NAME':'l3','HR MANAGER NAME':'hrmgr','Sub-Section':'subsec'
 };
 const COMP_COLS=['TIN','SSS NUMBER','PAGIBIG NUMBER','PHILHEALTH NUMBER'];
 const VALID_STATUSES=['Active','Off-Roster','Off-Detailing'];
@@ -1772,7 +1774,7 @@ function applyStatutoryData(data){
   allEmpFull=dedupeByEmployee(data.map(r=>(({
     id:r.employee_code,name:r.employee_name,email:r.email,
     estat:r.employment_status,etype:r.employment_type,desig:r.designation,
-    branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,intOrder:r.internal_order,
+    branch:r.branch,entity:r.entity,dept:r.department,sec:r.section,subsec:r.sub_section,intOrder:r.internal_order,
     doj:r.date_of_joining,tin:r.tin,sss:r.sss,pag:r.pagibig,ph:r.philhealth,
     l1:r.l1_manager,l2:r.l2_manager,l3:r.l3_manager,hrmgr:r.hr_manager
   }))));
@@ -1785,7 +1787,7 @@ function applyStatutoryData(data){
 function applyRequirementsData(data){
   reqAll=data.map(r=>(({
     id:r.employee_code,name:r.employee_name,email:r.email||'',estat:r.employment_status,
-    entity:r.entity,branch:r.branch,dept:r.department,sec:r.section,
+    entity:r.entity,branch:r.branch,dept:r.department,sec:r.section,subsec:r.sub_section||'',
     desig:r.designation||'',doj:r.date_of_joining||'',hrmgr:r.hr_manager||'',
     peme:r.peme,nbi:r.nbi,job:r.job_contract,birth:r.birth_cert,educ:r.proof_of_educ
   })));
@@ -2380,7 +2382,7 @@ async function processFile(buffer,status){
       const statRecords=allEmpFull.map(r=>({
         employee_code:r.id,employee_name:r.name,email:r.email,
         employment_status:r.estat,employment_type:r.etype,designation:r.desig,
-        branch:r.branch,entity:r.entity,department:r.dept,section:r.sec,internal_order:r.intOrder,
+        branch:r.branch,entity:r.entity,department:r.dept,section:r.sec,sub_section:r.subsec,internal_order:r.intOrder,
         date_of_joining:r.doj,tin:r.tin,sss:r.sss,pagibig:r.pag,philhealth:r.ph,
         l1_manager:r.l1,l2_manager:r.l2,l3_manager:r.l3,hr_manager:r.hrmgr
       }));
@@ -2458,17 +2460,18 @@ async function processReqFile(buffer,status){
       }
       status.textContent='Processing… '+Math.round((i/rawRows.length)*100)+'%';
       if(i<rawRows.length){setTimeout(chunkProcess,0);return;}
-      const branchLkp={},emailLkp={},desigLkp={},dojLkp={},hrmgrLkp={};
+      const branchLkp={},emailLkp={},desigLkp={},dojLkp={},hrmgrLkp={},subsecLkp={};
       all.forEach(r=>{
         if(r.id&&r.branch)branchLkp[r.id]=r.branch;
         if(r.id&&r.email)emailLkp[r.id]=r.email;
         if(r.id&&r.desig)desigLkp[r.id]=r.desig;
         if(r.id&&r.doj)dojLkp[r.id]=r.doj;
         if(r.id&&r.hrmgr)hrmgrLkp[r.id]=r.hrmgr;
+        if(r.id&&r.subsec)subsecLkp[r.id]=r.subsec;
       });
       const records=Object.values(empInfo).map(e=>(({
         ...e,branch:branchLkp[e.id]||'',email:emailLkp[e.id]||'',
-        desig:desigLkp[e.id]||'',doj:dojLkp[e.id]||'',hrmgr:hrmgrLkp[e.id]||'',
+        desig:desigLkp[e.id]||'',doj:dojLkp[e.id]||'',hrmgr:hrmgrLkp[e.id]||'',subsec:subsecLkp[e.id]||'',
         peme:pemeSet.has(e.id)?'Y':'X',nbi:nbiSet.has(e.id)?'Y':'X',
         job:jobSet.has(e.id)?'Y':'X',birth:birthSet.has(e.id)?'Y':'X',educ:educSet.has(e.id)?'Y':'X'
       })));
@@ -2478,7 +2481,7 @@ async function processReqFile(buffer,status){
       status.textContent='✓ Loaded '+records.length.toLocaleString()+' employees. Saving to database…';
       const reqRecords=records.map(r=>(({
         employee_code:r.id,employee_name:r.name,email:r.email,employment_status:r.estat,
-        entity:r.entity,branch:r.branch,department:r.dept,section:r.sec,
+        entity:r.entity,branch:r.branch,department:r.dept,section:r.sec,sub_section:r.subsec,
         designation:r.desig,date_of_joining:r.doj,hr_manager:r.hrmgr,
         peme:r.peme,nbi:r.nbi,job_contract:r.job,birth_cert:r.birth,proof_of_educ:r.educ
       })));
@@ -2827,7 +2830,7 @@ function exportConsolidated(){
 
   const header=[
     'Employee Code','Employee Name','Email Address','Status','Emp. Type','Designation',
-    'Branch','Entity','Department','Section','Date of Joining',
+    'Branch','Entity','Department','Section','Sub-Section','Date of Joining',
     'TIN','SSS','Pag-IBIG','PhilHealth',
     'PEME Completion','NBI Clearance','Job Offer & Contract','Birth Certificate','Proof of Education',
     'Compliance Status',
@@ -2842,7 +2845,7 @@ function exportConsolidated(){
     const complianceStatus=(statOk&&reqOk)?'COMPLETE':'INCOMPLETE';
     return [
       r.id,r.name,r.email,r.estat,r.etype,r.desig,
-      r.branch,r.entity,r.dept,r.sec,r.doj,
+      r.branch,r.entity,r.dept,r.sec,r.subsec,r.doj,
       tick(r.tin),tick(r.sss),tick(r.pag),tick(r.ph),
       hasReq?tick(req.peme):'N/A',hasReq?tick(req.nbi):'N/A',hasReq?tick(req.job):'N/A',hasReq?tick(req.birth):'N/A',hasReq?tick(req.educ):'N/A',
       complianceStatus,
