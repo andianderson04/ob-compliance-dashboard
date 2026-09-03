@@ -2883,6 +2883,7 @@ function exportConsolidated(){
     'Branch','Entity','Department','Section','Sub-Section','Date of Joining',
     'TIN','SSS','Pag-IBIG','PhilHealth',
     'PEME Completion','NBI Clearance','Job Offer & Contract','Birth Certificate','Proof of Education',
+    'Compliance Status',
     'L1 Manager','L2 Dept. Manager','L3 Division Head','HR Manager'
   ];
 
@@ -2902,6 +2903,7 @@ function exportConsolidated(){
       r.branch,r.entity,r.dept,r.sec,r.subsec,r.doj,
       tick(r.tin),tick(r.sss),tick(r.pag),tick(r.ph),
       hasReq?tick(req.peme):'N/A',hasReq?tick(req.nbi):'N/A',hasReq?tick(req.job):'N/A',hasReq?tick(req.birth):'N/A',hasReq?tick(req.educ):'N/A',
+      'INCOMPLETE',
       r.l1,r.l2,r.l3,r.hrmgr
     ];
   });
