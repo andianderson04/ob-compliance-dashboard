@@ -415,7 +415,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
       <span class="hdr-badge" id="hdr-count" title="Includes Active, Off-Roster, and Off-Detailing employees">&mdash;</span>
       <span style="font-size:11px;color:var(--ink-3)" title="Includes Active, Off-Roster, and Off-Detailing employees">employees</span>
       <div class="vdiv"></div>
-      <button class="btn-hdr" onclick="exportConsolidated()" title="One file: every active/off-roster/off-detailing employee with both statutory and requirements status">
+      <button class="btn-hdr" onclick="exportConsolidated()" title="One file: every active/off-roster/off-detailing employee with incomplete statutory or requirements compliance">
         <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Consolidated Report
       </button>
@@ -2883,22 +2883,25 @@ function exportConsolidated(){
     'Branch','Entity','Department','Section','Sub-Section','Date of Joining',
     'TIN','SSS','Pag-IBIG','PhilHealth',
     'PEME Completion','NBI Clearance','Job Offer & Contract','Birth Certificate','Proof of Education',
-    'Compliance Status',
     'L1 Manager','L2 Dept. Manager','L3 Division Head','HR Manager'
   ];
 
-  const rows=all.map(r=>{
+  // Consolidated Report only tracks incomplete compliance — complete employees are excluded.
+  const incomplete=all.filter(r=>{
     const req=reqById[r.id];
     const hasReq=!!req;
     const statOk=r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y';
     const reqOk=hasReq&&req.peme==='Y'&&req.nbi==='Y'&&req.job==='Y'&&req.birth==='Y'&&req.educ==='Y';
-    const complianceStatus=(statOk&&reqOk)?'COMPLETE':'INCOMPLETE';
+    return !(statOk&&reqOk);
+  });
+  const rows=incomplete.map(r=>{
+    const req=reqById[r.id];
+    const hasReq=!!req;
     return [
       r.id,r.name,r.email,r.estat,r.etype,r.desig,
       r.branch,r.entity,r.dept,r.sec,r.subsec,r.doj,
       tick(r.tin),tick(r.sss),tick(r.pag),tick(r.ph),
       hasReq?tick(req.peme):'N/A',hasReq?tick(req.nbi):'N/A',hasReq?tick(req.job):'N/A',hasReq?tick(req.birth):'N/A',hasReq?tick(req.educ):'N/A',
-      complianceStatus,
       r.l1,r.l2,r.l3,r.hrmgr
     ];
   });
