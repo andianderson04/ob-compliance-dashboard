@@ -577,6 +577,12 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <div class="lb-list" id="ovDeptLeaderboard"></div>
       </div>
     </div>
+    <div class="chart-strip" style="grid-template-columns:1fr">
+      <div class="chart-panel">
+        <div class="chart-panel-head"><span class="chart-panel-label">Ageing of missing requirements</span><span class="chart-panel-total" id="ovAgeingTotal">&mdash;</span></div>
+        <div class="lb-list" id="ovAgeingBuckets" style="max-height:none"></div>
+      </div>
+    </div>
   </div>
 
   <!-- REQUIREMENTS SECTION -->
@@ -1895,6 +1901,7 @@ function updateTabBadges(){
 /* ── OVERVIEW: FOCUS AREAS ── */
 function renderOverviewFocus(){
   if(!all.length)return;
+  const now=new Date();
   const rateClass=r=>r>=90?'c-ok':r>=80?'c-warn':'c-bad';
 
   // Requirement needing the most attention (lowest compliance rate)
@@ -2023,6 +2030,46 @@ function renderOverviewFocus(){
         `<div class="lb-bar-track"><div class="lb-bar-fill" style="width:${d.rate.toFixed(1)}%;background:${color}"></div></div>`+
         `<span class="lb-rate">${d.rate.toFixed(0)}%</span></div>`;
     }).join('');
+  }
+
+  // Ageing of missing requirements: how long (by tenure since DOJ) each employee with an
+  // outstanding requirement (PEME/NBI/Job Contract/Birth Cert/Proof of Educ) has been sitting
+  // incomplete. Uses the same tenureDaysAsOf clock already used for the 33-day HR Escalation
+  // mark, so "aged 45 days" means the same thing here as it does everywhere else on the dashboard.
+  const ageBuckets=[
+    {key:'0-7',label:'0–7 days',min:0,max:7,color:'#16A34A'},
+    {key:'8-14',label:'8–14 days',min:8,max:14,color:'#65A30D'},
+    {key:'15-30',label:'15–30 days',min:15,max:30,color:'#F59E0B'},
+    {key:'31-60',label:'31–60 days',min:31,max:60,color:'#EA580C'},
+    {key:'61+',label:'61+ days',min:61,max:Infinity,color:'#DC2626'}
+  ];
+  const ageCounts=ageBuckets.map(b=>({...b,count:0}));
+  let ageTotal=0;
+  reqAll.forEach(r=>{
+    if(!(r.peme==='X'||r.nbi==='X'||r.job==='X'||r.birth==='X'||r.educ==='X'))return;
+    if(!VALID_STATUSES.includes(r.estat))return;
+    const td=tenureDaysAsOf(r.doj,now);
+    if(td===null||td<0)return;
+    ageTotal++;
+    const bucket=ageCounts.find(b=>td>=b.min&&td<=b.max)||ageCounts[ageCounts.length-1];
+    bucket.count++;
+  });
+  const ageTotalEl=document.getElementById('ovAgeingTotal');
+  if(ageTotalEl)ageTotalEl.textContent=ageTotal.toLocaleString()+' outstanding';
+  const ageEl=document.getElementById('ovAgeingBuckets');
+  if(ageEl){
+    if(!ageTotal){
+      ageEl.innerHTML='<div class="issue-empty">No outstanding requirements right now.</div>';
+    }else{
+      const maxCount=Math.max(...ageCounts.map(b=>b.count),1);
+      ageEl.innerHTML=ageCounts.map(b=>{
+        const pct=maxCount?(b.count/maxCount*100):0;
+        return `<div class="lb-row clickable" title="${esc(b.label)}: ${b.count.toLocaleString()} employees with an outstanding requirement &mdash; click to view" onclick="goFilter('requirements',{'rf-comp':'missing'})">`+
+          `<span class="lb-name">${esc(b.label)}</span>`+
+          `<div class="lb-bar-track"><div class="lb-bar-fill" style="width:${pct.toFixed(1)}%;background:${b.color}"></div></div>`+
+          `<span class="lb-rate">${b.count.toLocaleString()}</span></div>`;
+      }).join('');
+    }
   }
 }
 
