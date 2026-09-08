@@ -2872,9 +2872,29 @@ function hasStatOrReqGap(statRow,reqRow){
   return statGap||reqGap;
 }
 
+// For the daily 33-day escalation report specifically, replaces the 9 individual pass/fail
+// columns and the combined status with one plain-language "Missing Items" column — the people
+// receiving this report need to know what to chase, not scan 9 columns for the X's. Every row
+// in this filtered view already has at least one gap by definition, so this is never blank here.
+function missingItemsList(r){
+  const items=[
+    [r.tin,'TIN'],[r.sss,'SSS'],[r.pag,'Pag-IBIG'],[r.ph,'PhilHealth'],
+    [r.req_peme,'PEME Completion'],[r.req_nbi,'NBI Clearance'],
+    [r.req_job,'Job Offer & Contract'],[r.req_birth,'Birth Certificate'],[r.req_educ,'Proof of Education']
+  ];
+  return items.filter(([v])=>v==='X').map(([,label])=>label).join(', ');
+}
 function exportXLSX(){
-  const h=COLS.map(c=>c.label);
-  const d=filtered.map(r=>COLS.map(c=>{
+  const isEscalateExport=document.getElementById('f-comp').value==='escalate33';
+  let cols=COLS;
+  if(isEscalateExport){
+    const startIdx=COLS.findIndex(c=>c.k==='tin');
+    const endIdx=COLS.findIndex(c=>c.k==='cs');
+    cols=[...COLS.slice(0,startIdx),{k:'__missing',label:'Missing Items',missingItems:true},...COLS.slice(endIdx+1)];
+  }
+  const h=cols.map(c=>c.label);
+  const d=filtered.map(r=>cols.map(c=>{
+    if(c.missingItems)return missingItemsList(r);
     const v=r[c.k]||'';
     if(c.comp)return v==='Y'?'✓':'✗';
     if(c.cs)return(r.tin==='Y'&&r.sss==='Y'&&r.pag==='Y'&&r.ph==='Y'&&r.req_peme==='Y'&&r.req_nbi==='Y'&&r.req_job==='Y'&&r.req_birth==='Y'&&r.req_educ==='Y')?'COMPLETE':'INCOMPLETE';
