@@ -2881,11 +2881,13 @@ function exportXLSX(){
     if(c.daysToMark){
       const val=r.daysToMark;
       if(val===null||val===undefined)return '';
-      return val>0?(val+' days left'):val===0?'Due today':(Math.abs(val)+' days overdue');
+      const n=Math.abs(val),unit=n===1?'day':'days';
+      return val>0?(`${n} ${unit} left`):val===0?'Due today':(`${n} ${unit} overdue`);
     }
     if(c.tenureDays){
       const val=r.tenureDays;
-      return(val===null||val===undefined)?'':(val+' days');
+      if(val===null||val===undefined)return '';
+      return `${val} ${val===1?'day':'days'}`;
     }
     return v;
   }));
