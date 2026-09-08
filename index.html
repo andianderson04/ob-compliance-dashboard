@@ -642,7 +642,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
       <select class="filter-sel" id="f-branch" onchange="doFilter()"><option value="">All branches</option></select>
       <select class="filter-sel" id="f-etype"  onchange="doFilter()"><option value="">All emp. types</option></select>
       <select class="filter-sel" id="f-estat"  onchange="doFilter()"><option value="">All statuses</option></select>
-      <select class="filter-sel" id="f-comp"   onchange="doFilter()">
+      <select class="filter-sel" id="f-comp"   onchange="onCompFilterChange()">
         <option value="">All compliance</option>
         <option value="missing">Has missing (&#10007;)</option>
         <option value="complete">All complete</option>
@@ -653,6 +653,7 @@ tbody tr:hover td:first-child{background:#F7F4EC}
         <option value="newhire">New hires (&le;30 days)</option>
         <option value="escalate33">HR escalation (hit day 33 today, incomplete)</option>
       </select>
+      <input type="date" class="filter-sel" id="f-escalate-date" style="display:none" title="Reconstructs which employees hit day 33 of tenure on this specific date, using their Date of Joining — works for any past date, not just today.">
       <select class="filter-sel" id="f-compstatus" onchange="doFilter()">
         <option value="">All statuses</option>
         <option value="COMPLETE">Complete</option>
@@ -2632,9 +2633,27 @@ function clearStatFilters(){
     const el=document.getElementById(id);
     if(el)el.value='';
   });
+  document.getElementById('f-escalate-date').value='';
+  document.getElementById('f-escalate-date').style.display='none';
   doFilter();
 }
 
+function updateEscalateDateVisibility(){
+  const fc=document.getElementById('f-comp').value;
+  const dateInput=document.getElementById('f-escalate-date');
+  if(fc==='escalate33'){
+    dateInput.style.display='';
+    dateInput.max=new Date().toISOString().slice(0,10);
+    if(!dateInput.value)dateInput.value=new Date().toISOString().slice(0,10);
+  }else{
+    dateInput.style.display='none';
+  }
+}
+function onCompFilterChange(){
+  updateEscalateDateVisibility();
+  doFilter();
+}
+document.getElementById('f-escalate-date').addEventListener('change',doFilter);
 function doFilter(){
   const q=(document.getElementById('q').value||'').toLowerCase();
   const fe=document.getElementById('f-entity').value;
@@ -2645,6 +2664,11 @@ function doFilter(){
   const fc=document.getElementById('f-comp').value;
   const fcs=document.getElementById('f-compstatus').value;
   const escalateLookup=fc==='escalate33'?reqByCodeMap():null;
+  // Reconstructs a past day's escalation list from Date of Joining alone — "who hit day 33 on
+  // this date" is always recoverable later, since DOJ never changes, even if that day's live
+  // report was never pulled. Defaults to today when the picker is untouched or hidden.
+  const escalateDateVal=document.getElementById('f-escalate-date').value;
+  const escalateAsOf=escalateDateVal?new Date(escalateDateVal+'T00:00:00'):new Date();
   filtered=all.filter(r=>{
     if(q&&!(r.id+' '+r.name+' '+r.desig).toLowerCase().includes(q))return false;
     if(fe&&r.entity!==fe)return false;if(fd&&r.dept!==fd)return false;
@@ -2659,7 +2683,7 @@ function doFilter(){
       if(td===null||td<0||td>30)return false;
     }
     if(fc==='escalate33'){
-      const td=tenureDaysAsOf(r.doj,new Date());
+      const td=tenureDaysAsOf(r.doj,escalateAsOf);
       if(td!==33)return false;
       if(!hasStatOrReqGap(r,escalateLookup.get(r.id)))return false;
     }
@@ -2789,6 +2813,7 @@ function goFilter(tab,sets){
     const el=document.getElementById(id);
     if(el)el.value=sets[id];
   });
+  if('f-comp' in sets)updateEscalateDateVisibility();
   const fn=fns[tab];
   if(fn)fn();
 }
