@@ -3237,48 +3237,116 @@ function siteSummaryIsCompliant(scope,statFields,reqFields){
   if(scope==='requirements')return reqOk;
   return statOk&&reqOk;
 }
-function buildSiteSummaryRows(records,scope,getStat,getReq){
-  const bySite={};
-  records.forEach(r=>{
-    const site=r.branch||'(Unspecified)';
-    if(!bySite[site])bySite[site]={total:0,compliant:0};
-    bySite[site].total++;
+// Same idea as the HR Escalation report's missing-items column, but scoped to only the domain(s)
+// relevant to the current export — a "Requirements Only" export shouldn't imply someone is
+// missing statutory items it never even checked.
+function missingItemsForScope(scope,statFields,reqFields){
+  const items=[];
+  if(scope==='statutory'||scope==='combined'){
+    if(!statFields){items.push('(no statutory record)');}
+    else{
+      if(statFields.tin==='X')items.push('TIN');
+      if(statFields.sss==='X')items.push('SSS');
+      if(statFields.pag==='X')items.push('Pag-IBIG');
+      if(statFields.ph==='X')items.push('PhilHealth');
+    }
+  }
+  if(scope==='requirements'||scope==='combined'){
+    if(!reqFields){items.push('(no requirements record)');}
+    else{
+      if(reqFields.peme==='X')items.push('PEME Completion');
+      if(reqFields.nbi==='X')items.push('NBI Clearance');
+      if(reqFields.job==='X')items.push('Job Offer & Contract');
+      if(reqFields.birth==='X')items.push('Birth Certificate');
+      if(reqFields.educ==='X')items.push('Proof of Education');
+    }
+  }
+  return items.join(', ');
+}
+// Builds per-employee compliance records for the chosen scope — the shared basis for both the
+// aggregated site totals and the clickable employee-level detail sheet.
+function buildSiteEmployeeRecords(records,scope,getStat,getReq,getId,getName){
+  return records.map(r=>{
     const statFields=(scope==='statutory'||scope==='combined')?getStat(r):null;
     const reqFields=(scope==='requirements'||scope==='combined')?getReq(r):null;
-    if(siteSummaryIsCompliant(scope,statFields,reqFields))bySite[site].compliant++;
+    const compliant=siteSummaryIsCompliant(scope,statFields,reqFields);
+    return {
+      id:getId(r),name:getName(r),branch:r.branch||'(Unspecified)',
+      compliant,
+      missingItems:compliant?'':missingItemsForScope(scope,statFields,reqFields),
+    };
   });
-  return bySite;
 }
 function exportSiteSummary(tabContext){
   const scope=document.getElementById(tabContext==='statutory'?'site-scope-stat':'site-scope-req').value;
-  let bySite;
+  let empRecords;
   if(tabContext==='statutory'){
     // `filtered` rows already carry both statutory fields and the annotated req_* fields
     // (from annotateRequirementsStatus), so no cross-tab lookup is needed here.
-    bySite=buildSiteSummaryRows(filtered,scope,
+    empRecords=buildSiteEmployeeRecords(filtered,scope,
       r=>r,
-      r=>({peme:r.req_peme,nbi:r.req_nbi,job:r.req_job,birth:r.req_birth,educ:r.req_educ}));
+      r=>({peme:r.req_peme,nbi:r.req_nbi,job:r.req_job,birth:r.req_birth,educ:r.req_educ}),
+      r=>r.id,r=>r.name);
   }else{
     // reqFiltered rows only carry requirements fields — statutory fields need a lookup into
     // `all` by employee code, same join key used elsewhere (e.g. the branch/email backfill).
     const statByCode=new Map(all.map(r=>[r.id,r]));
-    bySite=buildSiteSummaryRows(reqFiltered,scope,
+    empRecords=buildSiteEmployeeRecords(reqFiltered,scope,
       r=>statByCode.get(r.id)||null,
-      r=>r);
+      r=>r,
+      r=>r.id,r=>r.name);
   }
+
   const scopeLabel={statutory:'Statutory Only',requirements:'Requirements Only',combined:'Combined (Statutory + Requirements)'}[scope];
-  const header=['Branch / Site','Total Employees','Compliant','Missing','Compliance Rate'];
-  const rows=Object.keys(bySite)
-    .sort((a,b)=>(bySite[b].compliant/bySite[b].total)-(bySite[a].compliant/bySite[a].total))
-    .map(site=>{
-      const {total,compliant}=bySite[site];
-      const missing=total-compliant;
-      const rate=total?(compliant/total*100).toFixed(1)+'%':'0.0%';
-      return [site,total,compliant,missing,rate];
-    });
-  const ws=XLSX.utils.aoa_to_sheet([[`Compliance by Site — ${scopeLabel}`],header,...rows]);
+
+  // Aggregate to per-site totals, sorted highest-compliance-first (same convention as the
+  // Overview leaderboard).
+  const bySite={};
+  empRecords.forEach(r=>{
+    if(!bySite[r.branch])bySite[r.branch]={total:0,compliant:0};
+    bySite[r.branch].total++;
+    if(r.compliant)bySite[r.branch].compliant++;
+  });
+  const siteOrder=Object.keys(bySite).sort((a,b)=>(bySite[b].compliant/bySite[b].total)-(bySite[a].compliant/bySite[a].total));
+
+  // Build the detail sheet grouped by site (same order as the summary), and within each site,
+  // employees with a gap listed first — so the "Missing" link lands right at the top of exactly
+  // the group it names, and the "Compliant" link lands right where that group starts next.
+  const detailHeader=['Employee Code','Employee Name','Branch / Site','Status','Missing Items'];
+  const detailRows=[];
+  const missingStartRow={},compliantStartRow={};
+  siteOrder.forEach(site=>{
+    const siteRecords=empRecords.filter(r=>r.branch===site);
+    const missing=siteRecords.filter(r=>!r.compliant);
+    const compliantList=siteRecords.filter(r=>r.compliant);
+    missingStartRow[site]=detailRows.length+2; // +1 for the header row, +1 to convert to 1-indexed
+    missing.forEach(r=>detailRows.push([r.id,r.name,r.branch,'MISSING',r.missingItems]));
+    compliantStartRow[site]=detailRows.length+2;
+    compliantList.forEach(r=>detailRows.push([r.id,r.name,r.branch,'COMPLIANT','']));
+  });
+
+  // Build the summary sheet, then attach hyperlinks directly onto the Compliant/Missing number
+  // cells, pointing at the exact starting row of that site's matching block on the detail sheet.
+  const summaryHeader=['Branch / Site','Total Employees','Compliant','Missing','Compliance Rate'];
+  const summaryRows=siteOrder.map(site=>{
+    const {total,compliant}=bySite[site];
+    const missing=total-compliant;
+    const rate=total?(compliant/total*100).toFixed(1)+'%':'0.0%';
+    return [site,total,compliant,missing,rate];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([[`Compliance by Site — ${scopeLabel}`],summaryHeader,...summaryRows]);
+  siteOrder.forEach((site,i)=>{
+    const rowIdx=i+2; // 0-indexed: row 0 is the title, row 1 is the header
+    const compliantRef=XLSX.utils.encode_cell({r:rowIdx,c:2});
+    const missingRef=XLSX.utils.encode_cell({r:rowIdx,c:3});
+    if(ws[compliantRef])ws[compliantRef].l={Target:`#'Employee Detail'!A${compliantStartRow[site]}`,Tooltip:'View compliant employees'};
+    if(ws[missingRef])ws[missingRef].l={Target:`#'Employee Detail'!A${missingStartRow[site]}`,Tooltip:'View employees with a gap'};
+  });
+  const detailWs=XLSX.utils.aoa_to_sheet([detailHeader,...detailRows]);
+
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Compliance by Site');
+  XLSX.utils.book_append_sheet(wb,detailWs,'Employee Detail');
   XLSX.writeFile(wb,`TA_ComplianceBySite_${scope}_`+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
