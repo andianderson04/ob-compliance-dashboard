@@ -675,6 +675,15 @@ tbody tr:hover td:first-child{background:#F7F4EC}
             <div id="column-picker-list"></div>
           </div>
         </div>
+        <select class="filter-sel" id="site-scope-stat" style="width:auto" title="Which compliance items count toward the per-site rate in this export.">
+          <option value="combined">Combined (Statutory + Requirements)</option>
+          <option value="statutory">Statutory Only</option>
+          <option value="requirements">Requirements Only</option>
+        </select>
+        <button class="btn-export" style="background:var(--surface);color:var(--ink-1);border:1px solid var(--rule)" onclick="exportSiteSummary('statutory')" title="One row per branch/site: total employees, compliant, missing, and compliance rate for the scope selected — respects whatever filters are currently applied.">
+          <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12V8M6 12V4M10 12V6M2 2h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Export by Site
+        </button>
         <button class="btn-export" onclick="exportXLSX()">
           <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Export
@@ -3014,6 +3023,15 @@ function buildReqHTML(){
     <div class="tdiv"></div>
     <div class="toolbar-right">
       <span class="rec-pill" id="req-count-pill">&mdash;</span>
+      <select class="filter-sel" id="site-scope-req" style="width:auto" title="Which compliance items count toward the per-site rate in this export.">
+        <option value="combined">Combined (Statutory + Requirements)</option>
+        <option value="statutory">Statutory Only</option>
+        <option value="requirements">Requirements Only</option>
+      </select>
+      <button class="btn-export" style="background:var(--surface);color:var(--ink-1);border:1px solid var(--rule)" onclick="exportSiteSummary('requirements')" title="One row per branch/site: total employees, compliant, missing, and compliance rate for the scope selected — respects whatever filters are currently applied.">
+        <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12V8M6 12V4M10 12V6M2 2h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Export by Site
+      </button>
       <button class="btn-export" onclick="exportReqXLSX()">
         <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 1v8M4 6l3 3 3-3M2 10v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Export
@@ -3196,6 +3214,72 @@ function exportReqXLSX(){
   const ws=XLSX.utils.aoa_to_sheet([h,...d]);const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Requirements');
   XLSX.writeFile(wb,'TA_Requirements_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+// One row per branch/site instead of one per employee — the master rollup view that was
+// previously only achievable by filtering to each branch individually and exporting each
+// separately, with no compliance percentage shown at all. Respects whatever filters (entity,
+// department, status, etc.) are currently applied, same as the regular Export button.
+// Shared by both Statutory Numbers and Requirements' "Export by Site" — one row per branch,
+// with a choice of which items count toward the compliance rate: statutory only (4 items),
+// requirements only (5 items), or combined (all 9, matching the same all-9-must-be-complete
+// rule the HR Escalation report already uses). Missing data for whichever domain the current
+// scope actually needs counts as a gap, same as everywhere else in this dashboard — it's only
+// ignored when that domain isn't relevant to the scope selected.
+function siteSummaryIsCompliant(scope,statFields,reqFields){
+  let statOk=true,reqOk=true;
+  if(scope==='statutory'||scope==='combined'){
+    statOk=!!statFields&&statFields.tin==='Y'&&statFields.sss==='Y'&&statFields.pag==='Y'&&statFields.ph==='Y';
+  }
+  if(scope==='requirements'||scope==='combined'){
+    reqOk=!!reqFields&&reqFields.peme==='Y'&&reqFields.nbi==='Y'&&reqFields.job==='Y'&&reqFields.birth==='Y'&&reqFields.educ==='Y';
+  }
+  if(scope==='statutory')return statOk;
+  if(scope==='requirements')return reqOk;
+  return statOk&&reqOk;
+}
+function buildSiteSummaryRows(records,scope,getStat,getReq){
+  const bySite={};
+  records.forEach(r=>{
+    const site=r.branch||'(Unspecified)';
+    if(!bySite[site])bySite[site]={total:0,compliant:0};
+    bySite[site].total++;
+    const statFields=(scope==='statutory'||scope==='combined')?getStat(r):null;
+    const reqFields=(scope==='requirements'||scope==='combined')?getReq(r):null;
+    if(siteSummaryIsCompliant(scope,statFields,reqFields))bySite[site].compliant++;
+  });
+  return bySite;
+}
+function exportSiteSummary(tabContext){
+  const scope=document.getElementById(tabContext==='statutory'?'site-scope-stat':'site-scope-req').value;
+  let bySite;
+  if(tabContext==='statutory'){
+    // `filtered` rows already carry both statutory fields and the annotated req_* fields
+    // (from annotateRequirementsStatus), so no cross-tab lookup is needed here.
+    bySite=buildSiteSummaryRows(filtered,scope,
+      r=>r,
+      r=>({peme:r.req_peme,nbi:r.req_nbi,job:r.req_job,birth:r.req_birth,educ:r.req_educ}));
+  }else{
+    // reqFiltered rows only carry requirements fields — statutory fields need a lookup into
+    // `all` by employee code, same join key used elsewhere (e.g. the branch/email backfill).
+    const statByCode=new Map(all.map(r=>[r.id,r]));
+    bySite=buildSiteSummaryRows(reqFiltered,scope,
+      r=>statByCode.get(r.id)||null,
+      r=>r);
+  }
+  const scopeLabel={statutory:'Statutory Only',requirements:'Requirements Only',combined:'Combined (Statutory + Requirements)'}[scope];
+  const header=['Branch / Site','Total Employees','Compliant','Missing','Compliance Rate'];
+  const rows=Object.keys(bySite)
+    .sort((a,b)=>(bySite[b].compliant/bySite[b].total)-(bySite[a].compliant/bySite[a].total))
+    .map(site=>{
+      const {total,compliant}=bySite[site];
+      const missing=total-compliant;
+      const rate=total?(compliant/total*100).toFixed(1)+'%':'0.0%';
+      return [site,total,compliant,missing,rate];
+    });
+  const ws=XLSX.utils.aoa_to_sheet([[`Compliance by Site — ${scopeLabel}`],header,...rows]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Compliance by Site');
+  XLSX.writeFile(wb,`TA_ComplianceBySite_${scope}_`+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 /* ── PAYROLL ── */
