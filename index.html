@@ -2936,7 +2936,7 @@ function exportConsolidated(){
 
   const header=[
     'Employee Code','Employee Name','Email Address','Status','Emp. Type','Designation',
-    'Branch','Entity','Department','Section','Sub-Section','Date of Joining',
+    'Branch','Entity','Department','Section','Sub-Section','Date of Joining','Tenure (Days)',
     'TIN','SSS','Pag-IBIG','PhilHealth',
     'PEME Completion','NBI Clearance','Job Offer & Contract','Birth Certificate','Proof of Education',
     'Compliance Status',
@@ -2954,9 +2954,10 @@ function exportConsolidated(){
   const rows=incomplete.map(r=>{
     const req=reqById[r.id];
     const hasReq=!!req;
+    const tenureText=(r.tenureDays===null||r.tenureDays===undefined)?'':`${r.tenureDays} ${r.tenureDays===1?'day':'days'}`;
     return [
       r.id,r.name,r.email,r.estat,r.etype,r.desig,
-      r.branch,r.entity,r.dept,r.sec,r.subsec,r.doj,
+      r.branch,r.entity,r.dept,r.sec,r.subsec,r.doj,tenureText,
       tick(r.tin),tick(r.sss),tick(r.pag),tick(r.ph),
       hasReq?tick(req.peme):'N/A',hasReq?tick(req.nbi):'N/A',hasReq?tick(req.job):'N/A',hasReq?tick(req.birth):'N/A',hasReq?tick(req.educ):'N/A',
       'INCOMPLETE',
